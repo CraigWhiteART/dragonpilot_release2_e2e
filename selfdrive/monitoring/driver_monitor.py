@@ -18,18 +18,18 @@ class DRIVER_MONITOR_SETTINGS():
   def __init__(self, DT_DMON=DT_DMON):
     self._DT_DMON = DT_DMON
     # ref (page15-16): https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:42018X1947&rid=2
-    self._AWARENESS_TIME = 30. # passive wheeltouch total timeout
-    self._AWARENESS_PRE_TIME_TILL_TERMINAL = 15.
-    self._AWARENESS_PROMPT_TIME_TILL_TERMINAL = 6.
-    self._DISTRACTED_TIME = 11. # active monitoring total timeout
-    self._DISTRACTED_PRE_TIME_TILL_TERMINAL = 8.
-    self._DISTRACTED_PROMPT_TIME_TILL_TERMINAL = 6.
+    self._AWARENESS_TIME = 60. # passive wheeltouch total timeout
+    self._AWARENESS_PRE_TIME_TILL_TERMINAL = 30.
+    self._AWARENESS_PROMPT_TIME_TILL_TERMINAL = 12.
+    self._DISTRACTED_TIME = 22. # active monitoring total timeout
+    self._DISTRACTED_PRE_TIME_TILL_TERMINAL = 16.
+    self._DISTRACTED_PROMPT_TIME_TILL_TERMINAL = 12.
 
-    self._FACE_THRESHOLD = 0.5
-    self._PARTIAL_FACE_THRESHOLD = 0.45
-    self._EYE_THRESHOLD = 0.6
+    self._FACE_THRESHOLD = 0.2 #0.5
+    self._PARTIAL_FACE_THRESHOLD = 0.2 # 0.45
+    self._EYE_THRESHOLD = 0.2 #0.6
     self._SG_THRESHOLD = 0.91
-    self._BLINK_THRESHOLD = 0.55
+    self._BLINK_THRESHOLD = 0.2 # 0.55
     self._BLINK_THRESHOLD_SLACK = 0.7
     self._BLINK_THRESHOLD_STRICT = self._BLINK_THRESHOLD
 

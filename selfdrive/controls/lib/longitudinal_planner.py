@@ -352,10 +352,20 @@ class LongitudinalPlanner:
 
   def publish(self, sm, pm):
     plan_send = messaging.new_message('longitudinalPlan')
-
     plan_send.valid = sm.all_checks(service_list=['carState', 'controlsState'])
-
     longitudinalPlan = plan_send.longitudinalPlan
+
+    # Set cruise speed adjustments for button control
+    current_speed = sm['carState'].vEgo * CV.MS_TO_KPH
+    target_speed = float(self.v_desired_trajectory[0]) * CV.MS_TO_KPH
+    speed_diff = target_speed - current_speed
+    
+    # Only adjust if difference is significant (more than 2.5 km/h)
+    longitudinalPlan.speedDown = False
+    longitudinalPlan.speedUp = False
+    if abs(speed_diff) > 2.5:
+      longitudinalPlan.speedDown = speed_diff < 0
+      longitudinalPlan.speedUp = speed_diff > 0
     longitudinalPlan.modelMonoTime = sm.logMonoTime['modelV2']
     longitudinalPlan.processingDelay = (plan_send.logMonoTime / 1e9) - sm.logMonoTime['modelV2']
 

@@ -15,9 +15,6 @@ class CarController:
     self.es_dashstatus_cnt = -1
     self.cruise_button_prev = 0
     self.last_cancel_frame = 0
-    self.last_speed_adjust_frame = 0
-    self.target_speed = 0  # Target speed from planner
-    self.button_frame_delay = 10  # Minimum frames between button presses
 
     self.p = CarControllerParams(CP)
     self.packer = CANPacker(DBC[CP.carFingerprint]['pt'])
@@ -73,23 +70,10 @@ class CarController:
         self.es_distance_cnt = CS.es_distance_msg["COUNTER"]
 
     else:
-      bus = 1 if self.CP.carFingerprint in GLOBAL_GEN2 else 0
-      cruise_button = None
-
-      # Handle speed adjustments via button presses
-      if CC.cruiseControl.speedDown and self.frame > self.last_speed_adjust_frame + self.button_frame_delay:
-        cruise_button = 'set'  # SET reduces speed by 5 km/h
-        self.last_speed_adjust_frame = self.frame
-      elif CC.cruiseControl.speedUp and self.frame > self.last_speed_adjust_frame + self.button_frame_delay:
-        cruise_button = 'resume'  # RES increases speed by 5 km/h
-        self.last_speed_adjust_frame = self.frame
-
-      # Handle cancel and button presses
       if pcm_cancel_cmd and (self.frame - self.last_cancel_frame) > 0.2:
+        bus = 1 if self.CP.carFingerprint in GLOBAL_GEN2 else 0
         can_sends.append(subarucan.create_es_distance(self.packer, CS.es_distance_msg, bus, pcm_cancel_cmd))
         self.last_cancel_frame = self.frame
-      elif cruise_button is not None:
-        can_sends.append(subarucan.create_es_distance(self.packer, CS.es_distance_msg, bus, pcm_cancel_cmd, cruise_button))
 
       if self.es_dashstatus_cnt != CS.es_dashstatus_msg["COUNTER"]:
         can_sends.append(subarucan.create_es_dashstatus(self.packer, CS.es_dashstatus_msg))

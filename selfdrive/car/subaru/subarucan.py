@@ -14,15 +14,11 @@ def create_steering_control(packer, apply_steer):
 def create_steering_status(packer):
   return packer.make_can_msg("ES_LKAS_State", 0, {})
 
-def create_es_distance(packer, es_distance_msg, bus, pcm_cancel_cmd, cruise_button=None):
+def create_es_distance(packer, es_distance_msg, bus, pcm_cancel_cmd):
   values = copy.copy(es_distance_msg)
   values["COUNTER"] = (values["COUNTER"] + 1) % 0x10
   if pcm_cancel_cmd:
     values["Cruise_Cancel"] = 1
-  if cruise_button == 'set':
-    values["Cruise_Set"] = 1
-  elif cruise_button == 'resume':
-    values["Cruise_Resume"] = 1
   return packer.make_can_msg("ES_Distance", bus, values)
 
 def create_es_lkas(packer, es_lkas_msg, enabled, visual_alert, left_line, right_line, left_lane_depart, right_lane_depart):

@@ -1,0 +1,105 @@
+name: C2 Subaru CI
+
+on:
+  push:
+    branches:
+      - c2-subaru-improvements
+    paths:
+      - "selfdrive/car/subaru/**"
+      - "tools/subaru_steering_diag.py"
+      - ".github/workflows/c2-subaru-ci.yml"
+  pull_request:
+    paths:
+      - "selfdrive/car/subaru/**"
+      - "tools/subaru_steering_diag.py"
+      - ".github/workflows/c2-subaru-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate legacy C2 Subaru changes
+    runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.11"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Show environment
+        run: |
+          python --version
+          git rev-parse --short HEAD
+
+      - name: Check patch whitespace
+        run: git diff --check origin/${{ github.base_ref || 'deprecated-release2_e2e' }}...HEAD || git diff --check HEAD^
+
+      - name: Compile changed Python
+        run: |
+          python -m py_compile             selfdrive/car/subaru/interface.py             selfdrive/car/subaru/values.py             selfdrive/car/subaru/carcontroller.py             tools/subaru_steering_diag.py
+
+      - name: Validate Subaru firmware constants
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path("selfdrive/car/subaru/interface.py")
+          tree = ast.parse(path.read_text())
+
+          value = None
+          for node in tree.body:
+            if isinstance(node, ast.Assign):
+              if any(isinstance(t, ast.Name) and t.id == "IMPREZA_2018_EPS_FW" for t in node.targets):
+                value = ast.literal_eval(node.value)
+                break
+
+          expected = {
+            b'z\xc0\x00\x00',
+            b'z\xc0\x04\x00',
+            b'z\xc0\x08\x00',
+            b'\x8a\xc0\x00\x00',
+          }
+
+          assert value == expected, "Known early-Impreza EPS firmware set does not match expected binary IDs"
+          print("EPS firmware constants OK:", sorted(x.hex() for x in value))
+          PY
+
+      - name: Validate Subaru firmware query buses
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          tree = ast.parse(Path("selfdrive/car/subaru/values.py").read_text())
+          buses = []
+          for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+              name = getattr(node.func, "id", None)
+              if name == "Request":
+                for kw in node.keywords:
+                  if kw.arg == "bus":
+                    buses.append(ast.literal_eval(kw.value))
+
+          assert 0 in buses and 1 in buses, "Subaru firmware queries must probe both bus 0 and bus 1"
+          print("Firmware query buses OK:", buses)
+          PY
+
+      - name: Verify steering ceiling remains safety-conservative
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          text = Path("selfdrive/car/subaru/values.py").read_text()
+          assert "self.STEER_MAX = 2047" in text, "Legacy Subaru 2047 ceiling unexpectedly removed"
+          assert "self.STEER_MAX = 3071" not in text, "3071 must not be enabled without matching Panda safety support"
+          print("Legacy 2047 steering ceiling preserved")
+          PY

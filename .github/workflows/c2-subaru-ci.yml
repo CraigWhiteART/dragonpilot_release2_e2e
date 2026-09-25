@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git diff --check HEAD^1...HEAD^2
+            git diff --check HEAD^1 HEAD^2
           else
             git diff --check HEAD^
           fi

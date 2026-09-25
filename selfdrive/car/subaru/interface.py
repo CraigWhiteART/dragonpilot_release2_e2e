@@ -76,9 +76,11 @@ class CarInterface(CarInterfaceBase):
         (fw.ecu == "eps" or fw.ecu == car.CarParams.Ecu.eps) and fw.fwVersion in IMPREZA_HIGH_TORQUE_RESEARCH_EPS_FW
         for fw in car_fw
       )
-      if Params().get_bool("dp_subaru_high_torque_research") and research_eps:
+      steer_stage_raw = Params().get("dp_subaru_steer_stage", encoding="utf8")
+      steer_stage = int(steer_stage_raw) if steer_stage_raw else 0
+      if steer_stage > 0 and research_eps:
         # safetyParam=2 must be paired with the research Panda build. Deliberately
-        # leave actuator delay and lateral tuning unchanged for the first A/B test.
+        # leave actuator delay and lateral tuning unchanged for staged A/B tests.
         ret.safetyConfigs[0].safetyParam |= Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018
 
       ret.lateralTuning.init('pid')

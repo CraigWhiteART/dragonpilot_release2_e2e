@@ -135,7 +135,7 @@ jobs:
         run: |
           docker run --rm             -v /tmp/panda-c2:/tmp/openpilot/panda             -w /tmp/openpilot/panda             c2-panda-research             /bin/bash -lc '
               cd /tmp/openpilot &&
-              scons -j$(nproc) opendbc/ cereal/ &&
+              scons -f opendbc/SConstruct -j$(nproc) &&
               cd panda &&
               scons -j$(nproc) &&
               python -m unittest tests.safety.test_subaru

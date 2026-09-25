@@ -17,6 +17,13 @@ IMPREZA_2018_EPS_FW = {
   b'\x8a\xc0\x00\x00',
 }
 
+# Craig's detected EPS revision. Keep this separate from the community-tested
+# 3071 allowlist above: no public evidence was found proving 7ac00a00 at 3071.
+# It can only select the research Panda profile when the explicit param is set.
+IMPREZA_HIGH_TORQUE_RESEARCH_EPS_FW = {
+  b'z\xc0\n\x00',
+}
+
 
 class CarInterface(CarInterfaceBase):
 
@@ -64,6 +71,15 @@ class CarInterface(CarInterfaceBase):
       # without increasing the Panda-enforced steering torque limit.
       if any((fw.ecu == "eps" or fw.ecu == car.CarParams.Ecu.eps) and fw.fwVersion in IMPREZA_2018_EPS_FW for fw in car_fw):
         ret.steerActuatorDelay = 0.18
+
+      research_eps = any(
+        (fw.ecu == "eps" or fw.ecu == car.CarParams.Ecu.eps) and fw.fwVersion in IMPREZA_HIGH_TORQUE_RESEARCH_EPS_FW
+        for fw in car_fw
+      )
+      if Params().get_bool("dp_subaru_high_torque_research") and research_eps:
+        # safetyParam=2 must be paired with the research Panda build. Deliberately
+        # leave actuator delay and lateral tuning unchanged for the first A/B test.
+        ret.safetyConfigs[0].safetyParam |= Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018
 
       ret.lateralTuning.init('pid')
       ret.lateralTuning.pid.kf = 0.00005

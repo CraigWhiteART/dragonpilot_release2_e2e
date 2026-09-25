@@ -56,6 +56,11 @@ def main():
     "lateral_state",
     "lat_saturated",
     "lat_output",
+    "desired_steering_angle_deg",
+    "angle_error_deg",
+    "pid_p",
+    "pid_i",
+    "pid_f",
     "actual_lateral_accel",
     "desired_lateral_accel",
     "desired_curvature",
@@ -104,6 +109,11 @@ def main():
       lateral_state = ""
       lat_saturated = False
       lat_output = 0.0
+      desired_steering_angle_deg = 0.0
+      angle_error_deg = 0.0
+      pid_p = 0.0
+      pid_i = 0.0
+      pid_f = 0.0
       actual_lat_accel = 0.0
       desired_lat_accel = 0.0
 
@@ -119,6 +129,11 @@ def main():
           state = controls.lateralControlState.pidState
           lat_saturated = bool(state.saturated)
           lat_output = float(state.output)
+          desired_steering_angle_deg = float(state.steeringAngleDesiredDeg)
+          angle_error_deg = float(state.angleError)
+          pid_p = float(state.p)
+          pid_i = float(state.i)
+          pid_f = float(state.f)
         elif lateral_state == "lqrState":
           state = controls.lateralControlState.lqrState
           lat_saturated = bool(state.saturated)
@@ -148,6 +163,11 @@ def main():
         "lateral_state": lateral_state,
         "lat_saturated": int(bool(lat_saturated)),
         "lat_output": "%.6f" % lat_output,
+        "desired_steering_angle_deg": "%.4f" % desired_steering_angle_deg,
+        "angle_error_deg": "%.4f" % angle_error_deg,
+        "pid_p": "%.6f" % pid_p,
+        "pid_i": "%.6f" % pid_i,
+        "pid_f": "%.6f" % pid_f,
         "actual_lateral_accel": "%.6f" % actual_lat_accel,
         "desired_lateral_accel": "%.6f" % desired_lat_accel,
         "desired_curvature": "%.8f" % float(controls.desiredCurvature),

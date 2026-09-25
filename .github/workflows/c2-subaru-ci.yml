@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,7 +42,13 @@ jobs:
           git rev-parse --short HEAD
 
       - name: Check patch whitespace
-        run: git diff --check origin/${{ github.base_ref || 'deprecated-release2_e2e' }}...HEAD || git diff --check HEAD^
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "${{ github.event.pull_request.base.sha }}...HEAD"
+          else
+            git diff --check HEAD^
+          fi
 
       - name: Compile changed Python
         run: |

@@ -68,7 +68,7 @@ def main():
 
   print(f"dp_lateral_tune:      {get_param_text(params, 'dp_lateral_tune')}")
   print(f"dp_steer_rate_cost:   {get_param_text(params, 'dp_lateral_steer_rate_cost')}")
-  print(f"research torque flag: {get_param_text(params, 'dp_subaru_high_torque_research')}")
+  print(f"research steer stage:{get_param_text(params, 'dp_subaru_steer_stage'):>8}")
 
   if len(CP.safetyConfigs):
     for i, cfg in enumerate(CP.safetyConfigs):

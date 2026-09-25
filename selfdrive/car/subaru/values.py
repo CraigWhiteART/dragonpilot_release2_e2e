@@ -80,9 +80,33 @@ SUBARU_VERSION_RESPONSE = bytes([uds.SERVICE_TYPE.READ_DATA_BY_IDENTIFIER + 0x40
 
 FW_QUERY_CONFIG = FwQueryConfig(
   requests=[
+    # Query the ECUs Subaru uses for firmware fingerprinting. Explicitly probing
+    # both buses backports the more reliable later Subaru query strategy while
+    # staying compatible with this release2 FwQueryConfig implementation.
     Request(
       [StdQueries.TESTER_PRESENT_REQUEST, SUBARU_VERSION_REQUEST],
       [StdQueries.TESTER_PRESENT_RESPONSE, SUBARU_VERSION_RESPONSE],
+      whitelist_ecus=[Ecu.abs, Ecu.eps, Ecu.fwdCamera, Ecu.engine, Ecu.transmission],
+      bus=1,
+    ),
+    Request(
+      [StdQueries.TESTER_PRESENT_REQUEST, SUBARU_VERSION_REQUEST],
+      [StdQueries.TESTER_PRESENT_RESPONSE, SUBARU_VERSION_RESPONSE],
+      whitelist_ecus=[Ecu.abs, Ecu.eps, Ecu.fwdCamera, Ecu.engine, Ecu.transmission],
+      bus=0,
+    ),
+    # Some EyeSight camera modules do not answer tester-present first.
+    Request(
+      [SUBARU_VERSION_REQUEST],
+      [SUBARU_VERSION_RESPONSE],
+      whitelist_ecus=[Ecu.fwdCamera],
+      bus=1,
+    ),
+    Request(
+      [SUBARU_VERSION_REQUEST],
+      [SUBARU_VERSION_RESPONSE],
+      whitelist_ecus=[Ecu.fwdCamera],
+      bus=0,
     ),
   ],
 )

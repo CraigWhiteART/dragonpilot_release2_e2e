@@ -117,7 +117,7 @@ confs = [
   {'name': 'dp_following_profile', 'default': 0, 'type': 'UInt8', 'min': 0, 'max': 2, 'depends': [{'name': 'dp_following_profile_ctrl', 'vals': [True]}], 'conf_type': ['param', 'struct']},
   {'name': 'dp_lateral_tune', 'default': 0, 'type': 'UInt8', 'conf_type': ['param']},
   {'name': 'dp_lateral_torque_live_tune', 'default': False, 'type': 'Bool', 'conf_type': ['param']},
-  {'name': 'dp_subaru_high_torque_research', 'default': False, 'type': 'Bool', 'conf_type': ['param']},
+  {'name': 'dp_subaru_steer_stage', 'default': 0, 'type': 'UInt8', 'min': 0, 'max': 6, 'conf_type': ['param']},
   # {'name': 'dp_accel_profile_ctrl', 'default': False, 'type': 'Bool', 'conf_type': ['param', 'struct']},
   # {'name': 'dp_accel_profile', 'default': 0, 'type': 'UInt8', 'min': 0, 'max': 2, 'depends': [{'name': 'dp_accel_profile_ctrl', 'vals': [True]}], 'conf_type': ['param', 'struct']},
   # # safety

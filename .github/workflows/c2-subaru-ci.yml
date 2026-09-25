@@ -7,12 +7,12 @@ on:
     paths:
       - "selfdrive/car/subaru/**"
       - "selfdrive/car/car_helpers.py"
-      - "selfdrive/car/car_helpers.py"
       - "tools/subaru_steering_diag.py"
       - ".github/workflows/c2-subaru-ci.yml"
   pull_request:
     paths:
       - "selfdrive/car/subaru/**"
+      - "selfdrive/car/car_helpers.py"
       - "tools/subaru_steering_diag.py"
       - ".github/workflows/c2-subaru-ci.yml"
   workflow_dispatch:
@@ -54,7 +54,12 @@ jobs:
 
       - name: Compile changed Python
         run: |
-          python -m py_compile             selfdrive/car/subaru/interface.py             selfdrive/car/subaru/values.py             selfdrive/car/subaru/carcontroller.py             tools/subaru_steering_diag.py
+          python -m py_compile \
+            selfdrive/car/subaru/interface.py \
+            selfdrive/car/subaru/values.py \
+            selfdrive/car/subaru/carcontroller.py \
+            selfdrive/car/car_helpers.py \
+            tools/subaru_steering_diag.py
 
       - name: Validate Subaru firmware constants
         run: |

@@ -82,7 +82,8 @@ interfaces = load_interfaces(interface_names)
 
 # **** for use live only ****
 def fingerprint(logcan, sendcan, num_pandas):
-  fixed_fingerprint = os.environ.get('FINGERPRINT', "")
+  env_fixed_fingerprint = os.environ.get('FINGERPRINT', "")
+  fixed_fingerprint = env_fixed_fingerprint
   skip_fw_query = os.environ.get('SKIP_FW_QUERY', False)
   ecu_rx_addrs = set()
 
@@ -91,7 +92,10 @@ def fingerprint(logcan, sendcan, num_pandas):
     car_selected = dp_car_assigned.strip()
     fixed_fingerprint = car_selected
 
-  if not fixed_fingerprint and not skip_fw_query:
+  # DragonPilot's manually assigned car should select the interface, but it
+  # should not suppress VIN/ECU firmware discovery. Preserve the historical
+  # behavior of the explicit FINGERPRINT environment override for developers.
+  if not env_fixed_fingerprint and not skip_fw_query:
     # Vin query only reliably works through OBDII
     bus = 1
 

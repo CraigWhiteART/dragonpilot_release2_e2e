@@ -8,6 +8,8 @@ on:
       - "selfdrive/car/subaru/**"
       - "selfdrive/car/car_helpers.py"
       - "tools/subaru_steering_diag.py"
+      - "tools/subaru_steering_log.py"
+      - "tools/subaru_steering_log.py"
       - ".github/workflows/c2-subaru-ci.yml"
   pull_request:
     paths:
@@ -59,7 +61,8 @@ jobs:
             selfdrive/car/subaru/values.py \
             selfdrive/car/subaru/carcontroller.py \
             selfdrive/car/car_helpers.py \
-            tools/subaru_steering_diag.py
+            tools/subaru_steering_diag.py \
+            tools/subaru_steering_log.py
 
       - name: Validate Subaru firmware constants
         run: |

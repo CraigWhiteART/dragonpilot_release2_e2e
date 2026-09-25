@@ -1,0 +1,144 @@
+name: C2 Subaru Panda Research
+
+on:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - "tools/research/patch_c2_legacy_panda.py"
+      - ".github/workflows/c2-subaru-panda-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Reconstruct, build, and safety-test legacy C2 Panda
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout DragonPilot host research branch
+        uses: actions/checkout@v4
+
+      - name: Clone pinned legacy Panda source
+        run: |
+          git clone https://github.com/dragonpilot/panda.git /tmp/panda-c2
+          git -C /tmp/panda-c2 checkout 1d732d4747ea81c199906e9f1fc620911fb8add0
+          test "$(git -C /tmp/panda-c2 rev-parse HEAD)" = "1d732d4747ea81c199906e9f1fc620911fb8add0"
+
+      - name: Apply C2 compatibility and Subaru research patch
+        run: |
+          python3 tools/research/patch_c2_legacy_panda.py /tmp/panda-c2
+
+      - name: Validate safety invariants and C2 ABI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import struct
+
+          root = Path("/tmp/panda-c2")
+          subaru = (root / "board/safety/safety_subaru.h").read_text()
+          py = (root / "python/__init__.py").read_text()
+          health = (root / "board/health.h").read_text()
+
+          assert subaru.count(".max_steer = 2047") == 1
+          assert subaru.count(".max_steer = 3071") == 1
+          assert subaru.count(".max_steer = 1000") == 1
+
+          alt = subaru.split("SUBARU_STEERING_LIMITS_IMPREZA_2018", 1)[1].split("};", 1)[0]
+          required = {
+              ".max_rt_delta = 940",
+              ".max_rt_interval = 250000",
+              ".max_rate_up = 50",
+              ".max_rate_down = 70",
+              ".driver_torque_factor = 50",
+              ".driver_torque_allowance = 60",
+              ".type = TorqueDriverLimited",
+          }
+          missing = sorted(x for x in required if x not in alt)
+          assert not missing, missing
+
+          assert "SUBARU_PARAM_MAX_STEER_IMPREZA_2018 = 2" in subaru
+          assert "FLAG_SUBARU_MAX_STEER_IMPREZA_2018 = 2" in py
+          assert "#define ALT_EXP_ALKA 16" in (root / "board/safety_declarations.h").read_text()
+
+          m = re.search(r'HEALTH_STRUCT = struct\.Struct\("([^"]+)"\)', py)
+          assert m
+          fmt = m.group(1)
+          assert fmt == "<IIIIIIIIIBBBBBBHBBBHfBBB", fmt
+          assert struct.calcsize(fmt) == 55, struct.calcsize(fmt)
+          assert "uint8_t usb_power_mode;" in health
+
+          print("Stock Subaru max: 2047")
+          print("Experimental safetyParam=2 max: 3071")
+          print("Gen2 Subaru max: 1000")
+          print("Dynamic torque limits unchanged")
+          print("C2 health v11 Python struct size:", struct.calcsize(fmt))
+          PY
+
+      - name: Build historical Panda toolchain image
+        run: |
+          export DOCKER_BUILDKIT=1
+          docker build -t c2-panda-research -f /tmp/panda-c2/Dockerfile /tmp/panda-c2
+
+      - name: Build F4 Panda firmware
+        run: |
+          docker run --rm             -v /tmp/panda-c2:/tmp/openpilot/panda             -w /tmp/openpilot/panda             c2-panda-research             /bin/bash -lc 'scons -j$(nproc)'
+
+      - name: Run Subaru Panda safety tests
+        run: |
+          docker run --rm             -v /tmp/panda-c2:/tmp/openpilot/panda             -w /tmp/openpilot/panda             c2-panda-research             /bin/bash -lc '
+              cd /tmp/openpilot &&
+              scons -j$(nproc) opendbc/ cereal/ &&
+              cd panda &&
+              scons -j$(nproc) &&
+              python -m unittest tests.safety.test_subaru
+            '
+
+      - name: Show firmware metadata
+        run: |
+          ls -lh /tmp/panda-c2/board/obj/panda.bin.signed
+          sha256sum /tmp/panda-c2/board/obj/panda.bin.signed
+          cat /tmp/panda-c2/board/obj/version
+
+      - name: Package research metadata
+        run: |
+          mkdir -p /tmp/c2-panda-artifact
+          cp /tmp/panda-c2/board/obj/panda.bin.signed /tmp/c2-panda-artifact/
+          cp /tmp/panda-c2/board/obj/version /tmp/c2-panda-artifact/
+          cp /tmp/panda-c2/board/safety/safety_subaru.h /tmp/c2-panda-artifact/safety_subaru.h
+          cat > /tmp/c2-panda-artifact/README.txt <<'EOF'
+          RESEARCH ARTIFACT ONLY - DO NOT FLASH WITHOUT MATCHED HOST CONFIGURATION
+
+          Base Panda source:
+            dragonpilot/panda
+            1d732d4747ea81c199906e9f1fc620911fb8add0
+
+          Profiles:
+            Subaru stock safetyParam 0: max_steer 2047
+            Subaru Gen2 safetyParam 1: max_steer 1000
+            Subaru research safetyParam 2: max_steer 3071
+
+          safetyParam 2 preserves the stock early-Subaru:
+            max_rt_delta 940
+            max_rt_interval 250000 us
+            max_rate_up 50
+            max_rate_down 70
+            driver_torque_factor 50
+            driver_torque_allowance 60
+
+          This build includes reconstructed DragonPilot ALKA behavior and the
+          C2 release's v11 health-packet byte layout. The usb_power_mode byte
+          is an ABI placeholder pending exact private-source reconstruction.
+          EOF
+
+      - name: Upload research firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-subaru-panda-research
+          path: /tmp/c2-panda-artifact/
+          if-no-files-found: error
+          retention-days: 14

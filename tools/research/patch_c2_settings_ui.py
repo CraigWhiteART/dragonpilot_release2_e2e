@@ -34,6 +34,14 @@ def replace_once(path: Path, old: str, new: str) -> None:
 def patch_cc(root: Path) -> None:
   path = root / "selfdrive/ui/qt/offroad/settings_dp.cc"
 
+  text = path.read_text()
+  include_marker = '#include "selfdrive/ui/qt/offroad/settings_dp.h"\n'
+  if include_marker not in text:
+    raise RuntimeError(f"{path}: include marker missing")
+  if "#include <algorithm>" not in text:
+    text = text.replace(include_marker, include_marker + "\n#include <algorithm>\n#include <string>\n")
+    path.write_text(text)
+
   old = """void DPCtrlPanel::add_car_specific_toggles() {
   add_toyota_toggles();
   add_hkg_toggles();
@@ -78,7 +86,7 @@ def patch_cc(root: Path) -> None:
       stage = 0;
     }
 
-    stage = (stage + 1) % steer_stages.size();
+    stage = (stage + 1) % static_cast<int>(steer_stages.size());
 
     if (stage >= 5) {
       const QString warning = stage == 5

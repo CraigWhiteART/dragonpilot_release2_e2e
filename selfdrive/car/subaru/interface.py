@@ -6,6 +6,17 @@ from selfdrive.car.interfaces import CarInterfaceBase
 from selfdrive.car.subaru.values import CAR, GLOBAL_GEN2, PREGLOBAL_CARS
 from common.params import Params
 
+# Early Global-platform Impreza/Crosstrek EPS firmware variants measured by the
+# community to have ~0.18 s steering actuator delay. Keep this independent of
+# steering torque limits: the C2 panda firmware in this fork still enforces the
+# legacy Subaru safety configuration.
+IMPREZA_2018_EPS_FW = {
+  b'z\xc0\x00\x00',
+  b'z\xc0\x04\x00',
+  b'z\xc0\x08\x00',
+  b'\x8a\xc0\x00\x00',
+}
+
 
 class CarInterface(CarInterfaceBase):
 
@@ -45,7 +56,15 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.67
       ret.centerToFront = ret.wheelbase * 0.5
       ret.steerRatio = 15
-      ret.steerActuatorDelay = 0.4   # end-to-end angle controller
+      ret.steerActuatorDelay = 0.4   # fallback for unclassified EPS firmware
+
+      # Later Subaru community testing measured ~0.18 s actuator delay on these
+      # 2017-19 Impreza / 2018-19 Crosstrek EPS variants. Using the measured
+      # delay lets lateral control anticipate steering response more accurately
+      # without increasing the Panda-enforced steering torque limit.
+      if any((fw.ecu == "eps" or fw.ecu == car.CarParams.Ecu.eps) and fw.fwVersion in IMPREZA_2018_EPS_FW for fw in car_fw):
+        ret.steerActuatorDelay = 0.18
+
       ret.lateralTuning.init('pid')
       ret.lateralTuning.pid.kf = 0.00005
       ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0., 20.], [0., 20.]]
@@ -112,10 +131,6 @@ class CarInterface(CarInterfaceBase):
     ret = self.CS.update(self.cp, self.cp_cam, self.cp_body)
 
     ret.events = self.create_common_events(ret).to_msg()
-
-    events = self.create_common_events(ret)
-
-    ret.events = events.to_msg()
 
     return ret
 

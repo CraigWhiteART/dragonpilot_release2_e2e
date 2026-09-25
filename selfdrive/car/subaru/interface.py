@@ -62,7 +62,7 @@ class CarInterface(CarInterfaceBase):
       # 2017-19 Impreza / 2018-19 Crosstrek EPS variants. Using the measured
       # delay lets lateral control anticipate steering response more accurately
       # without increasing the Panda-enforced steering torque limit.
-      if any(fw.ecu == "eps" and fw.fwVersion in IMPREZA_2018_EPS_FW for fw in car_fw):
+      if any((fw.ecu == "eps" or fw.ecu == car.CarParams.Ecu.eps) and fw.fwVersion in IMPREZA_2018_EPS_FW for fw in car_fw):
         ret.steerActuatorDelay = 0.18
 
       ret.lateralTuning.init('pid')

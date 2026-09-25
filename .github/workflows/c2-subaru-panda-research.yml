@@ -69,7 +69,7 @@ jobs:
           assert m
           fmt = m.group(1)
           assert fmt == "<IIIIIIIIIBBBBBBHBBBHfBBB", fmt
-          assert struct.calcsize(fmt) == 55, struct.calcsize(fmt)
+          assert struct.calcsize(fmt) == 56, struct.calcsize(fmt)
           assert "uint8_t usb_power_mode;" in health
 
           print("Stock Subaru max: 2047")

@@ -6,6 +6,7 @@ on:
       - c2-subaru-panda-research
     paths:
       - "tools/research/patch_c2_legacy_panda.py"
+      - "tools/research/patch_c2_settings_ui.py"
       - "panda/python/__init__.py"
       - "common/dp_conf.py"
       - "selfdrive/car/subaru/interface.py"
@@ -45,7 +46,9 @@ jobs:
           conf = Path("common/dp_conf.py").read_text()
 
           assert "FLAG_SUBARU_MAX_STEER_IMPREZA_2018 = 2" in panda_py
-          assert "dp_subaru_high_torque_research" in conf
+          assert "'dp_subaru_steer_stage'" in conf
+          assert "'default': 0" in conf
+          assert "'max': 6" in conf
 
           # Experimental EPS must remain separate from the community-tested set.
           assert "IMPREZA_HIGH_TORQUE_RESEARCH_EPS_FW" in interface
@@ -53,16 +56,40 @@ jobs:
           tested_block = interface.split("IMPREZA_2018_EPS_FW = {", 1)[1].split("}", 1)[0]
           assert "b'z\\xc0\\n\\x00'" not in tested_block
 
-          # Research flag only turns on behind an explicit param + exact EPS match.
-          assert 'Params().get_bool("dp_subaru_high_torque_research") and research_eps' in interface
+          # SafetyParam 2 can only turn on for a non-stock stage + exact EPS match.
+          assert 'Params().get("dp_subaru_steer_stage", encoding="utf8")' in interface
+          assert "steer_stage > 0 and research_eps" in interface
           assert "Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018" in interface
 
-          # Host max follows Panda safetyParam; normal fallback is still 2047.
-          assert "self.STEER_MAX = 2300" in values
-          assert "self.STEER_MAX = 3071" not in values
+          # Host choices are a fixed progressive set; stage 0 remains stock.
+          expected = "(2047, 2150, 2300, 2450, 2600, 2800, 3071)"
+          assert f"SUBARU_STEER_MAX_STAGES = {expected}" in values
+          assert 'Params().get("dp_subaru_steer_stage", encoding="utf8")' in values
+          assert "self.STEER_MAX = SUBARU_STEER_MAX_STAGES[stage]" in values
           assert "self.STEER_MAX = 2047" in values
 
-          print("Host research profile is explicitly gated and exact-EPS scoped")
+          print("Host research profile is exact-EPS gated with stages:", expected)
+          PY
+
+      - name: Validate staged DragonPilot settings UI patch
+        run: |
+          git clone --depth 1 https://github.com/dragonpilot/source_r2.git /tmp/source-r2-ui
+          python3 tools/research/patch_c2_settings_ui.py /tmp/source-r2-ui
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          cc = Path("/tmp/source-r2-ui/selfdrive/ui/qt/offroad/settings_dp.cc").read_text()
+          hh = Path("/tmp/source-r2-ui/selfdrive/ui/qt/offroad/settings_dp.h").read_text()
+
+          assert "Subaru - Research" in cc
+          assert "Steering Authority" in cc
+          assert "dp_subaru_steer_stage" in cc
+          assert "steer_stages{2047, 2150, 2300, 2450, 2600, 2800, 3071}" in cc
+          assert "stage >= 5" in cc
+          assert "add_subaru_toggles();" in cc
+          assert "void add_subaru_toggles();" in hh
+          print("R2 settings UI patch contains all seven staged steering values")
           PY
 
       - name: Clone pinned legacy Panda source

@@ -9,13 +9,13 @@ on:
       - "selfdrive/car/car_helpers.py"
       - "tools/subaru_steering_diag.py"
       - "tools/subaru_steering_log.py"
-      - "tools/subaru_steering_log.py"
       - ".github/workflows/c2-subaru-ci.yml"
   pull_request:
     paths:
       - "selfdrive/car/subaru/**"
       - "selfdrive/car/car_helpers.py"
       - "tools/subaru_steering_diag.py"
+      - "tools/subaru_steering_log.py"
       - ".github/workflows/c2-subaru-ci.yml"
   workflow_dispatch:
 

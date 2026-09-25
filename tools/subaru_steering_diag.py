@@ -17,6 +17,10 @@ KNOWN_3071_EPS_FW = {
   b'\x8a\xc0\x00\x00',
 }
 
+RESEARCH_EPS_FW = {
+  b'z\xc0\n\x00',
+}
+
 
 def get_param_text(params, key):
   value = params.get(key)
@@ -64,6 +68,7 @@ def main():
 
   print(f"dp_lateral_tune:      {get_param_text(params, 'dp_lateral_tune')}")
   print(f"dp_steer_rate_cost:   {get_param_text(params, 'dp_lateral_steer_rate_cost')}")
+  print(f"research torque flag: {get_param_text(params, 'dp_subaru_high_torque_research')}")
 
   if len(CP.safetyConfigs):
     for i, cfg in enumerate(CP.safetyConfigs):
@@ -81,7 +86,10 @@ def main():
     print("EPS firmware:         <not present in cached CarParams>")
 
   known_high_torque_eps = any(version in KNOWN_3071_EPS_FW for version in eps_fw)
+  research_eps = any(version in RESEARCH_EPS_FW for version in eps_fw)
   print(f"known 3071-era EPS:   {'YES' if known_high_torque_eps else 'no/unknown'}")
+  print(f"research EPS match:   {'YES (7ac00a00)' if research_eps else 'no'}")
+  print(f"research profile on:  {'YES' if controller.STEER_MAX == 3071 else 'no'}")
 
   if CP.carFingerprint == CAR.IMPREZA:
     if known_high_torque_eps:
@@ -93,6 +101,9 @@ def main():
       print("")
       print("This is the 2017-19 Impreza/Crosstrek platform, but the cached EPS firmware")
       print("did not match the known community-tested 3071 firmware list.")
+      if research_eps:
+        print("7ac00a00 is the separately gated research EPS revision; it is not being")
+        print("represented as community-proven at 3071.")
 
 
 if __name__ == "__main__":

@@ -75,7 +75,7 @@ def main():
     if is_eps_firmware(fw):
       version = bytes(fw.fwVersion)
       eps_fw.append(version)
-      print(f"EPS firmware:         {version.hex(' ')}  ({version!r})")
+      print(f"EPS firmware:         {version.hex()}  ({version!r})")
 
   if not eps_fw:
     print("EPS firmware:         <not present in cached CarParams>")

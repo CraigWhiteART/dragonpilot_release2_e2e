@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Dict, List, Union
 
 from cereal import car
+from panda import Panda
 from panda.python import uds
 from selfdrive.car import dbc_dict
 from selfdrive.car.docs_definitions import CarInfo, Harness
@@ -24,6 +25,8 @@ class CarControllerParams:
       self.STEER_MAX = 1000
       self.STEER_DELTA_UP = 40
       self.STEER_DELTA_DOWN = 40
+    elif CP.safetyConfigs[0].safetyParam & Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018:
+      self.STEER_MAX = 3071
     elif CP.carFingerprint == CAR.IMPREZA_2020:
       self.STEER_MAX = 1439
     else:

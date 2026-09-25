@@ -11,10 +11,10 @@ from common.params import Params
 # steering torque limits: the C2 panda firmware in this fork still enforces the
 # legacy Subaru safety configuration.
 IMPREZA_2018_EPS_FW = {
-  b'z\\xc0\\x00\\x00',
-  b'z\\xc0\\x04\\x00',
-  b'z\\xc0\\x08\\x00',
-  b'\\x8a\\xc0\\x00\\x00',
+  b'z\xc0\x00\x00',
+  b'z\xc0\x04\x00',
+  b'z\xc0\x08\x00',
+  b'\x8a\xc0\x00\x00',
 }
 
 

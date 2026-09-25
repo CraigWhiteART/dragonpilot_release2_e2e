@@ -162,6 +162,9 @@ jobs:
         run: |
           docker run --rm             -v /tmp/panda-c2:/tmp/openpilot/panda             -w /tmp/openpilot/panda             c2-panda-research             /bin/bash -lc '
               cd /tmp/openpilot &&
+              rm -rf opendbc &&
+              git clone https://github.com/commaai/opendbc.git opendbc &&
+              git -C opendbc checkout 296f190000a2e71408e207ba21a2257cc853ec15 &&
               scons -f opendbc/SConstruct -j$(nproc) &&
               cd panda &&
               scons -j$(nproc) &&

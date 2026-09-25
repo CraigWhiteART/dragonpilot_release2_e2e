@@ -89,7 +89,7 @@ def main():
   research_eps = any(version in RESEARCH_EPS_FW for version in eps_fw)
   print(f"known 3071-era EPS:   {'YES' if known_high_torque_eps else 'no/unknown'}")
   print(f"research EPS match:   {'YES (7ac00a00)' if research_eps else 'no'}")
-  print(f"research profile on:  {'YES' if controller.STEER_MAX == 3071 else 'no'}")
+  print(f"research profile on:  {'YES' if controller.STEER_MAX > 2047 else 'no'}")
 
   if CP.carFingerprint == CAR.IMPREZA:
     if known_high_torque_eps:
@@ -104,6 +104,8 @@ def main():
       if research_eps:
         print("7ac00a00 is the separately gated research EPS revision; it is not being")
         print("represented as community-proven at 3071.")
+        if controller.STEER_MAX > 2047:
+          print(f"Current staged host ceiling: {controller.STEER_MAX} (Panda research absolute max 3071).")
 
 
 if __name__ == "__main__":

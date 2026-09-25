@@ -6,6 +6,8 @@ on:
       - c2-subaru-improvements
     paths:
       - "selfdrive/car/subaru/**"
+      - "selfdrive/car/car_helpers.py"
+      - "selfdrive/car/car_helpers.py"
       - "tools/subaru_steering_diag.py"
       - ".github/workflows/c2-subaru-ci.yml"
   pull_request:
@@ -99,6 +101,18 @@ jobs:
 
           assert 0 in buses and 1 in buses, "Subaru firmware queries must probe both bus 0 and bus 1"
           print("Firmware query buses OK:", buses)
+          PY
+
+      - name: Validate manual car selection still queries firmware
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          text = Path("selfdrive/car/car_helpers.py").read_text()
+          assert "env_fixed_fingerprint = os.environ.get('FINGERPRINT', \"\")" in text
+          assert "if not env_fixed_fingerprint and not skip_fw_query:" in text
+          assert "if not fixed_fingerprint and not skip_fw_query:" not in text
+          print("Manual DragonPilot car selection no longer suppresses ECU firmware queries")
           PY
 
       - name: Verify steering ceiling remains safety-conservative

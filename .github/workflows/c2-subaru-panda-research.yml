@@ -12,6 +12,7 @@ on:
       - "selfdrive/car/subaru/interface.py"
       - "selfdrive/car/subaru/values.py"
       - "tools/subaru_steering_diag.py"
+      - "tools/subaru_steering_stage.py"
       - ".github/workflows/c2-subaru-panda-research.yml"
   workflow_dispatch:
 
@@ -35,7 +36,8 @@ jobs:
             selfdrive/car/subaru/values.py \
             common/dp_conf.py \
             panda/python/__init__.py \
-            tools/subaru_steering_diag.py
+            tools/subaru_steering_diag.py \
+            tools/subaru_steering_stage.py
 
           python3 - <<'PY'
           from pathlib import Path

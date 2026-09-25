@@ -26,7 +26,9 @@ class CarControllerParams:
       self.STEER_DELTA_UP = 40
       self.STEER_DELTA_DOWN = 40
     elif CP.safetyConfigs[0].safetyParam & Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018:
-      self.STEER_MAX = 3071
+      # First on-car research stage: intentionally below the Panda's historical
+      # 3071 absolute ceiling. Raise only after comparing logged A/B behavior.
+      self.STEER_MAX = 2300
     elif CP.carFingerprint == CAR.IMPREZA_2020:
       self.STEER_MAX = 1439
     else:

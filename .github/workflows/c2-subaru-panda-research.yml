@@ -6,6 +6,10 @@ on:
       - c2-subaru-panda-research
     paths:
       - "tools/research/patch_c2_legacy_panda.py"
+      - "panda/python/__init__.py"
+      - "common/dp_conf.py"
+      - "selfdrive/car/subaru/interface.py"
+      - "selfdrive/car/subaru/values.py"
       - ".github/workflows/c2-subaru-panda-research.yml"
   workflow_dispatch:
 
@@ -21,6 +25,42 @@ jobs:
     steps:
       - name: Checkout DragonPilot host research branch
         uses: actions/checkout@v4
+
+      - name: Validate gated host-side research profile
+        run: |
+          python3 -m py_compile \
+            selfdrive/car/subaru/interface.py \
+            selfdrive/car/subaru/values.py \
+            common/dp_conf.py \
+            panda/python/__init__.py
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          interface = Path("selfdrive/car/subaru/interface.py").read_text()
+          values = Path("selfdrive/car/subaru/values.py").read_text()
+          panda_py = Path("panda/python/__init__.py").read_text()
+          conf = Path("common/dp_conf.py").read_text()
+
+          assert "FLAG_SUBARU_MAX_STEER_IMPREZA_2018 = 2" in panda_py
+          assert "dp_subaru_high_torque_research" in conf
+
+          # Experimental EPS must remain separate from the community-tested set.
+          assert "IMPREZA_HIGH_TORQUE_RESEARCH_EPS_FW" in interface
+          assert "b'z\\xc0\\n\\x00'" in interface
+          tested_block = interface.split("IMPREZA_2018_EPS_FW = {", 1)[1].split("}", 1)[0]
+          assert "b'z\\xc0\\n\\x00'" not in tested_block
+
+          # Research flag only turns on behind an explicit param + exact EPS match.
+          assert 'Params().get_bool("dp_subaru_high_torque_research") and research_eps' in interface
+          assert "Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018" in interface
+
+          # Host max follows Panda safetyParam; normal fallback is still 2047.
+          assert "self.STEER_MAX = 3071" in values
+          assert "self.STEER_MAX = 2047" in values
+
+          print("Host research profile is explicitly gated and exact-EPS scoped")
+          PY
 
       - name: Clone pinned legacy Panda source
         run: |

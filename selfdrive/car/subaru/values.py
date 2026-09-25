@@ -4,12 +4,15 @@ from typing import Dict, List, Union
 
 from cereal import car
 from panda import Panda
+from common.params import Params
 from panda.python import uds
 from selfdrive.car import dbc_dict
 from selfdrive.car.docs_definitions import CarInfo, Harness
 from selfdrive.car.fw_query_definitions import FwQueryConfig, Request, StdQueries, p16
 
 Ecu = car.CarParams.Ecu
+
+SUBARU_STEER_MAX_STAGES = (2047, 2150, 2300, 2450, 2600, 2800, 3071)
 
 
 class CarControllerParams:
@@ -26,9 +29,10 @@ class CarControllerParams:
       self.STEER_DELTA_UP = 40
       self.STEER_DELTA_DOWN = 40
     elif CP.safetyConfigs[0].safetyParam & Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018:
-      # First on-car research stage: intentionally below the Panda's historical
-      # 3071 absolute ceiling. Raise only after comparing logged A/B behavior.
-      self.STEER_MAX = 2300
+      raw_stage = Params().get("dp_subaru_steer_stage", encoding="utf8")
+      stage = int(raw_stage) if raw_stage else 0
+      stage = max(0, min(stage, len(SUBARU_STEER_MAX_STAGES) - 1))
+      self.STEER_MAX = SUBARU_STEER_MAX_STAGES[stage]
     elif CP.carFingerprint == CAR.IMPREZA_2020:
       self.STEER_MAX = 1439
     else:

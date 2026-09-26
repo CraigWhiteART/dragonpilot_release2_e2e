@@ -16,6 +16,7 @@ from selfdrive.car.subaru.values import SUBARU_STEER_MAX_STAGES
 
 
 PARAM = "dp_subaru_steer_stage"
+ENABLE_PARAM = "dp_subaru_steer_enable"
 
 
 def current_stage(params):
@@ -36,6 +37,7 @@ def main():
     stage = current_stage(params)
     print("stage:", stage)
     print("STEER_MAX:", SUBARU_STEER_MAX_STAGES[stage])
+    print("enabled:", params.get_bool(ENABLE_PARAM))
     print("choices:", ", ".join(map(str, SUBARU_STEER_MAX_STAGES)))
     return
 
@@ -52,7 +54,9 @@ def main():
 
   stage = SUBARU_STEER_MAX_STAGES.index(requested)
   params.put(PARAM, str(stage))
+  params.put_bool(ENABLE_PARAM, requested != 2047)
 
+  print("research enabled:", requested != 2047)
   print("set stage:", stage)
   print("STEER_MAX:", requested)
   print("Restart required for the new stage to become active.")

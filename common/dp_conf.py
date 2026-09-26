@@ -79,7 +79,8 @@ confs = [
   {'name': 'dp_accel_profile', 'default': 0, 'type': 'UInt8', 'min': 0, 'max': 2, 'depends': [{'name': 'dp_accel_profile_ctrl', 'vals': [True]}], 'conf_type': ['param', 'struct']},
   {'name': 'dp_toyota_ap_btn_link', 'default': False, 'type': 'Bool', 'conf_type': ['param']},
   {'name': 'dp_toyota_cruise_override', 'default': False, 'type': 'Bool', 'conf_type': ['param', 'struct']},
-  {'name': 'dp_toyota_cruise_override_speed', 'default': 30, 'type': 'UInt8', 'min': 5, 'max': 60, 'depends': [{'name': 'dp_accel_profile_ctrl', 'vals': [True]}], 'conf_type': ['param', 'struct']},
+  # Reused as Subaru steering stage (0..6) on c2-subaru-panda-research. The key is already registered in the prebuilt C2 Params binary.
+  {'name': 'dp_toyota_cruise_override_speed', 'default': 0, 'type': 'UInt8', 'min': 0, 'max': 6, 'conf_type': ['param', 'struct']},
   {'name': 'dp_toyota_auto_lock', 'default': False, 'type': 'Bool', 'conf_type': ['param', 'struct']},
   {'name': 'dp_toyota_auto_unlock', 'default': False, 'type': 'Bool', 'conf_type': ['param', 'struct']},
   {'name': 'dp_toyota_fp_btn_link', 'default': False, 'type': 'Bool', 'conf_type': ['param']},
@@ -117,8 +118,6 @@ confs = [
   {'name': 'dp_following_profile', 'default': 0, 'type': 'UInt8', 'min': 0, 'max': 2, 'depends': [{'name': 'dp_following_profile_ctrl', 'vals': [True]}], 'conf_type': ['param', 'struct']},
   {'name': 'dp_lateral_tune', 'default': 0, 'type': 'UInt8', 'conf_type': ['param']},
   {'name': 'dp_lateral_torque_live_tune', 'default': False, 'type': 'Bool', 'conf_type': ['param']},
-  {'name': 'dp_subaru_steer_enable', 'default': False, 'type': 'Bool', 'conf_type': ['param']},
-  {'name': 'dp_subaru_steer_stage', 'default': 0, 'type': 'UInt8', 'min': 0, 'max': 6, 'conf_type': ['param']},
   # {'name': 'dp_accel_profile_ctrl', 'default': False, 'type': 'Bool', 'conf_type': ['param', 'struct']},
   # {'name': 'dp_accel_profile', 'default': 0, 'type': 'UInt8', 'min': 0, 'max': 2, 'depends': [{'name': 'dp_accel_profile_ctrl', 'vals': [True]}], 'conf_type': ['param', 'struct']},
   # # safety
@@ -292,6 +291,18 @@ def init_params_vals(params):
         params.put(conf['name'], get_support_car_list())
       elif params.get(conf['name']) is None:
         params.put(conf['name'], to_param_val(conf['name'], conf['default']))
+
+  # This stripped C2 release validates Param names inside a prebuilt extension,
+  # so the Subaru research UI intentionally reuses two existing Toyota keys.
+  # Migrate any legacy Toyota speed value (normally 30) to the safe stock stage.
+  try:
+    raw_stage = params.get('dp_toyota_cruise_override_speed', encoding='utf8')
+    steer_stage = int(raw_stage) if raw_stage else 0
+  except (ValueError, TypeError):
+    steer_stage = 0
+  if steer_stage < 0 or steer_stage > 6:
+    params.put('dp_toyota_cruise_override_speed', '0')
+    params.put_bool('dp_toyota_cruise_override', False)
 
 def gen_params_cc_keys():
   for conf in confs:

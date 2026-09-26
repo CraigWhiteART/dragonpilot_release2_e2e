@@ -42,22 +42,21 @@ jobs:
           import hashlib
 
           expected = {
-            "selfdrive/ui/_ui": "8b92ddbf63830a21f6a71ec52aad5f5949287e438676738a90053a54896c10cc",
-            "selfdrive/ui/_ui_nonav": "3dd2e552b5609c1b860bc93e4ba4e04c3d08af81043ebbc881d3924365caa14b",
+            "selfdrive/ui/_ui": "df17a7d160ae3d2df527892345d43475f5846d4f532ffc79874059035cf15a2c",
+            "selfdrive/ui/_ui_nonav": "5eb06f3e6d45c8743332e7dadd0cf7abacbe5397184c363db3b7d4e8626c7ad2",
           }
           for name, want in expected.items():
             data = Path(name).read_bytes()
             got = hashlib.sha256(data).hexdigest()
             assert got == want, (name, got)
             for marker in (
-              b"dp_subaru_steer_stage",
-              b"dp_subaru_steer_enable",
+              b"dp_toyota_cruise_override_speed",
+              b"dp_toyota_cruise_override",
               b"Steering Authority Stage",
               b"Enable Subaru Steering Stages",
             ):
               assert marker in data, (name, marker)
-            assert b"dp_toyota_cruise_override_speed" not in data
-          print("Exact C2 UI binaries contain the Subaru 0..6 stage selector")
+                      print("Exact C2 UI binaries contain the Subaru 0..6 stage selector")
           PY
 
       - name: Clone pinned legacy Panda
@@ -110,9 +109,9 @@ jobs:
           values = Path("selfdrive/car/subaru/values.py").read_text()
           panda_py = Path("panda/python/__init__.py").read_text()
 
-          assert "'dp_subaru_steer_enable'" in conf
-          assert "'default': False" in conf
-          assert "'dp_subaru_steer_stage'" in conf
+          assert "'dp_toyota_cruise_override'" in conf
+          assert "'dp_toyota_cruise_override_speed'" in conf
+          assert "'default': 0" in conf
           assert "steer_research_enabled and steer_stage > 0 and research_eps" in interface
           assert "b'z\\xc0\\n\\x00'" in interface
           assert "SUBARU_STEER_MAX_STAGES = (2047, 2150, 2300, 2450, 2600, 2800, 3071)" in values

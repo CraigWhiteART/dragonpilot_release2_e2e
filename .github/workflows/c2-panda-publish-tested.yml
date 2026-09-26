@@ -55,7 +55,7 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add panda/board/obj/panda.bin.signed
+          git add -f panda/board/obj/panda.bin.signed
           git commit -m "Publish tested C2 Subaru research Panda firmware"
           git pull --rebase origin c2-subaru-panda-research
           git push origin HEAD:c2-subaru-panda-research

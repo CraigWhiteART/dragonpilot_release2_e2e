@@ -7,6 +7,7 @@ Run from the openpilot/dragonpilot checkout:
 
 from cereal import car
 from common.params import Params
+from panda import DEFAULT_FW_FN, Panda
 from selfdrive.car.subaru.values import CAR, CarControllerParams
 
 
@@ -68,7 +69,15 @@ def main():
 
   print(f"dp_lateral_tune:      {get_param_text(params, 'dp_lateral_tune')}")
   print(f"dp_steer_rate_cost:   {get_param_text(params, 'dp_lateral_steer_rate_cost')}")
+  print(f"research enabled:    {'YES' if params.get_bool('dp_subaru_steer_enable') else 'no'}")
   print(f"research steer stage:{get_param_text(params, 'dp_subaru_steer_stage'):>8}")
+
+  try:
+    expected_sig = Panda.get_signature_from_firmware(DEFAULT_FW_FN)
+    active_sigs = params.get("PandaSignatures") or b""
+    print(f"panda firmware match: {'YES' if expected_sig and expected_sig in active_sigs else 'no/unknown'}")
+  except Exception as exc:
+    print(f"panda firmware match: <unable to verify: {exc}>")
 
   if len(CP.safetyConfigs):
     for i, cfg in enumerate(CP.safetyConfigs):

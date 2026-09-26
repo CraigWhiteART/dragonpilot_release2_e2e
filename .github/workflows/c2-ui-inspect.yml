@@ -31,3 +31,11 @@ jobs:
           strings -a -n 4 selfdrive/ui/_ui | grep -Ei 'dp_|dragonpilot|lateral controller|steer|eps|honda|toyota|subaru|hyundai' | head -800 || true
           echo "=== nonav params/labels ==="
           strings -a -n 4 selfdrive/ui/_ui_nonav | grep -Ei 'dp_|dragonpilot|lateral controller|steer|eps|honda|toyota|subaru|hyundai' | head -800 || true
+          echo "=== all DragonPilot class/function symbols ==="
+          nm -C selfdrive/ui/_ui 2>/dev/null | grep -E ' [TtWw] DP[A-Za-z0-9_:<>() ,*&~-]+' | head -2000 || true
+          echo "=== exact DP parameter strings ==="
+          strings -a -n 4 selfdrive/ui/_ui | grep -E '^dp_[a-z0-9_]+ | sort -u || true
+          echo "=== settings compile unit ==="
+          readelf --debug-dump=info selfdrive/ui/_ui 2>/dev/null | grep -B8 -A40 -E 'DW_AT_name.*settings_dp\\.cc' | head -300 || true
+          echo "=== settings line table ==="
+          readelf --debug-dump=decodedline selfdrive/ui/_ui 2>/dev/null | grep -E 'settings_dp\\.cc' | head -400 || true

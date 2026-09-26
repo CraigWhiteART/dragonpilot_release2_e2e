@@ -1,0 +1,33 @@
+name: C2 UI Inspect
+
+on:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - ".github/workflows/c2-ui-inspect.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect shipped C2 UI ELF
+        run: |
+          set -euxo pipefail
+          file selfdrive/ui/_ui selfdrive/ui/_ui_nonav
+          ls -lh selfdrive/ui/_ui selfdrive/ui/_ui_nonav
+          readelf -h selfdrive/ui/_ui
+          echo "=== dynamic ==="
+          readelf -d selfdrive/ui/_ui | head -200 || true
+          echo "=== symbols matching DP/settings ==="
+          nm -C selfdrive/ui/_ui 2>/dev/null | grep -Ei 'DPCtrl|Settings|ButtonParam|ParamSpin|dragon|lateral|honda|toyota|subaru' | head -400 || true
+          echo "=== ASCII params/labels ==="
+          strings -a -n 4 selfdrive/ui/_ui | grep -Ei 'dp_|dragonpilot|lateral controller|steer|eps|honda|toyota|subaru|hyundai' | head -800 || true
+          echo "=== nonav params/labels ==="
+          strings -a -n 4 selfdrive/ui/_ui_nonav | grep -Ei 'dp_|dragonpilot|lateral controller|steer|eps|honda|toyota|subaru|hyundai' | head -800 || true

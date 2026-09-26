@@ -36,14 +36,14 @@ jobs:
           import hashlib
 
           expected = {
-            "selfdrive/ui/_ui": "8b92ddbf63830a21f6a71ec52aad5f5949287e438676738a90053a54896c10cc",
-            "selfdrive/ui/_ui_nonav": "3dd2e552b5609c1b860bc93e4ba4e04c3d08af81043ebbc881d3924365caa14b",
+            "selfdrive/ui/_ui": "df17a7d160ae3d2df527892345d43475f5846d4f532ffc79874059035cf15a2c",
+            "selfdrive/ui/_ui_nonav": "5eb06f3e6d45c8743332e7dadd0cf7abacbe5397184c363db3b7d4e8626c7ad2",
           }
           for path, digest in expected.items():
             data = Path(path).read_bytes()
             assert hashlib.sha256(data).hexdigest() == digest
-            assert b"dp_subaru_steer_enable" in data
-            assert b"dp_subaru_steer_stage" in data
+            assert b"dp_toyota_cruise_override" in data
+            assert b"dp_toyota_cruise_override_speed" in data
             assert b"Enable Subaru Steering Stages" in data
             assert b"Steering Authority Stage" in data
           print("UI artifacts validated")

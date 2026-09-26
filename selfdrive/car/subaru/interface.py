@@ -77,8 +77,13 @@ class CarInterface(CarInterfaceBase):
         for fw in car_fw
       )
       steer_stage_raw = Params().get("dp_subaru_steer_stage", encoding="utf8")
-      steer_stage = int(steer_stage_raw) if steer_stage_raw else 0
-      if steer_stage > 0 and research_eps:
+      try:
+        steer_stage = int(steer_stage_raw) if steer_stage_raw else 0
+      except ValueError:
+        steer_stage = 0
+      steer_stage = max(0, min(steer_stage, 6))
+      steer_research_enabled = Params().get_bool("dp_subaru_steer_enable")
+      if steer_research_enabled and steer_stage > 0 and research_eps:
         # safetyParam=2 must be paired with the research Panda build. Deliberately
         # leave actuator delay and lateral tuning unchanged for staged A/B tests.
         ret.safetyConfigs[0].safetyParam |= Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018

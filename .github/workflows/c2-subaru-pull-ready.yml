@@ -135,6 +135,6 @@ jobs:
             exit 0
           fi
 
-          git add selfdrive/ui/_ui selfdrive/ui/_ui_nonav panda/board/obj/panda.bin.signed
+          git add selfdrive/ui/_ui selfdrive/ui/_ui_nonav\n          git add -f panda/board/obj/panda.bin.signed
           git commit -m "Package pull-ready C2 Subaru steering research build"
           git push origin HEAD:c2-subaru-panda-research

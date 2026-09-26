@@ -29,7 +29,7 @@ class CarControllerParams:
       self.STEER_DELTA_UP = 40
       self.STEER_DELTA_DOWN = 40
     elif CP.safetyConfigs[0].safetyParam & Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018:
-      raw_stage = Params().get("dp_subaru_steer_stage", encoding="utf8")
+      raw_stage = Params().get("dp_toyota_cruise_override_speed", encoding="utf8")
       stage = int(raw_stage) if raw_stage else 0
       stage = max(0, min(stage, len(SUBARU_STEER_MAX_STAGES) - 1))
       self.STEER_MAX = SUBARU_STEER_MAX_STAGES[stage]

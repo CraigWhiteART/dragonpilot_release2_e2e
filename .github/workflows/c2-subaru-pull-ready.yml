@@ -122,13 +122,20 @@ jobs:
 
       - name: Commit pull-ready artifacts
         run: |
+          # Source-only commits may have landed while the historical Panda image
+          # was building. Rebase first; our generated binary changes remain in
+          # the working tree and are replayed onto the newest branch head.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git stash push -m pull-ready-artifacts -- selfdrive/ui/_ui selfdrive/ui/_ui_nonav panda/board/obj/panda.bin.signed
+          git pull --rebase origin c2-subaru-panda-research
+          git stash pop
+
           if git diff --quiet -- selfdrive/ui/_ui selfdrive/ui/_ui_nonav panda/board/obj/panda.bin.signed; then
             echo "Pull-ready artifacts already committed"
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add selfdrive/ui/_ui selfdrive/ui/_ui_nonav panda/board/obj/panda.bin.signed
           git commit -m "Package pull-ready C2 Subaru steering research build"
           git push origin HEAD:c2-subaru-panda-research

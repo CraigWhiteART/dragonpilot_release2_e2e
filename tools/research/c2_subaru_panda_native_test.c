@@ -8,7 +8,6 @@
 
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "tests/libpanda/panda.c"
 
@@ -16,8 +15,7 @@
 #define SUBARU_RESEARCH_PARAM 2U
 
 static CANPacket_t es_lkas(int torque) {
-  CANPacket_t msg;
-  memset(&msg, 0, sizeof(msg));
+  CANPacket_t msg = {0};
   msg.addr = 0x122U;
   msg.bus = 0U;
   msg.data_len_code = 8U;

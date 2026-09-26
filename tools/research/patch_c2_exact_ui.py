@@ -65,20 +65,23 @@ def patch_instruction(data, offset, old_hex, new_hex):
 
 
 def patch(path):
-  key = path.name
-  if key not in ORIGINALS:
-    raise RuntimeError(f"unsupported UI binary: {path}")
-
-  meta = ORIGINALS[key]
   data = bytearray(path.read_bytes())
   before = hashlib.sha256(data).hexdigest()
 
-  if before == meta["patched_sha256"]:
-    print(f"{key}: already patched")
-    return
+  key = None
+  meta = None
+  for candidate, candidate_meta in ORIGINALS.items():
+    if before in (candidate_meta["sha256"], candidate_meta["patched_sha256"]):
+      key = candidate
+      meta = candidate_meta
+      break
 
-  if before != meta["sha256"]:
-    raise RuntimeError(f"{key}: unexpected original SHA256 {before}")
+  if key is None:
+    raise RuntimeError(f"{path}: unsupported UI SHA256 {before}")
+
+  if before == meta["patched_sha256"]:
+    print(f"{path}: already patched as {key}")
+    return
 
   stage_offset = replace_cstr(
     data, "dp_toyota_cruise_override_speed", "dp_subaru_steer_stage"
@@ -126,7 +129,7 @@ def patch(path):
   if after != meta["patched_sha256"]:
     raise RuntimeError(f"{key}: patched SHA256 mismatch {after}")
 
-  print(f"{key}: patched {before[:12]} -> {after[:12]}")
+  print(f"{path}: patched as {key} {before[:12]} -> {after[:12]}")
 
 
 def main():

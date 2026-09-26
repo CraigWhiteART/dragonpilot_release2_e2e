@@ -19,12 +19,12 @@ import sys
 ORIGINALS = {
   "_ui": {
     "sha256": "c3240fa84b23aff8b141ad3265c99eb803e59fe9539e558bbb872b4a1affb00a",
-    "patched_sha256": "8b92ddbf63830a21f6a71ec52aad5f5949287e438676738a90053a54896c10cc",
+    "patched_sha256": "df17a7d160ae3d2df527892345d43475f5846d4f532ffc79874059035cf15a2c",
     "widget": 0x77000,
   },
   "_ui_nonav": {
     "sha256": "bac87b8a1572512ce2ac8b0663ddab6ed538c59d630d2e02b596628db2d38422",
-    "patched_sha256": "3dd2e552b5609c1b860bc93e4ba4e04c3d08af81043ebbc881d3924365caa14b",
+    "patched_sha256": "5eb06f3e6d45c8743332e7dadd0cf7abacbe5397184c363db3b7d4e8626c7ad2",
     "widget": 0x6FA10,
   },
 }
@@ -83,9 +83,11 @@ def patch(path):
     print(f"{path}: already patched as {key}")
     return
 
-  stage_offset = replace_cstr(
-    data, "dp_toyota_cruise_override_speed", "dp_subaru_steer_stage"
-  )
+  # Keep the original registered C2 Param name. The stripped release validates
+  # known keys inside prebuilt params_pyx.so, so renaming it would fail at runtime.
+  stage_offset = data.find(b"dp_toyota_cruise_override_speed")
+  if stage_offset < 0:
+    raise RuntimeError(f"{key}: Toyota stage Param string missing")
   replace_cstr(data, "Override Speed When Below", "Steering Authority Stage")
   replace_cstr(
     data,
@@ -99,8 +101,7 @@ def patch(path):
     raise RuntimeError(f"{key}: stage unit string moved")
   data[unit_offset:unit_offset + 5] = b" / 6\0"
 
-  replace_cstr(data, "dp_toyota_cruise_override", "dp_subaru_steer_enable")
-  replace_cstr(data, "Turn On Cruise Speed Override", "Enable Subaru Steering Stages")
+  # Likewise keep dp_toyota_cruise_override as the already-registered enable key.\n  replace_cstr(data, "Turn On Cruise Speed Override", "Enable Subaru Steering Stages")
   replace_cstr(
     data,
     "This feature will let you set your cruise speed below vehicle standard. (usually at 26~40 km/h)",
@@ -113,15 +114,9 @@ def patch(path):
 
   fn = meta["widget"]
 
-  # QString::fromAscii_helper explicit length: 31 -> 21
-  patch_instruction(data, fn + 0x68, "e1130032", "a1028052")
-
   # ParamSpinBoxControl min/max: 5..60 -> 0..6. Step stays 1.
   patch_instruction(data, fn + 0x108, "a5008052", "05008052")
   patch_instruction(data, fn + 0x124, "e60f1e32", "c6008052")
-
-  # Paired toggle parameter QString length: 25 -> 22.
-  patch_instruction(data, fn + 0x2D8, "21038052", "c1028052")
 
   path.write_bytes(data)
 

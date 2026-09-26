@@ -15,8 +15,8 @@ from common.params import Params
 from selfdrive.car.subaru.values import SUBARU_STEER_MAX_STAGES
 
 
-PARAM = "dp_subaru_steer_stage"
-ENABLE_PARAM = "dp_subaru_steer_enable"
+PARAM = "dp_toyota_cruise_override_speed"
+ENABLE_PARAM = "dp_toyota_cruise_override"
 
 
 def current_stage(params):

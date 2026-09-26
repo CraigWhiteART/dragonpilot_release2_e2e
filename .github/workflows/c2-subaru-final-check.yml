@@ -1,0 +1,76 @@
+name: C2 Subaru Final Pull Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - "selfdrive/ui/_ui"
+      - "selfdrive/ui/_ui_nonav"
+      - "panda/board/obj/panda.bin.signed"
+      - "common/dp_conf.py"
+      - "selfdrive/car/subaru/interface.py"
+      - "selfdrive/car/subaru/values.py"
+      - "panda/python/__init__.py"
+      - "tools/subaru_steering_stage.py"
+      - "tools/subaru_steering_diag.py"
+      - ".github/workflows/c2-subaru-final-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify exact pull-ready artifacts
+        run: |
+          set -euxo pipefail
+          echo "df17a7d160ae3d2df527892345d43475f5846d4f532ffc79874059035cf15a2c  selfdrive/ui/_ui" | sha256sum -c -
+          echo "5eb06f3e6d45c8743332e7dadd0cf7abacbe5397184c363db3b7d4e8626c7ad2  selfdrive/ui/_ui_nonav" | sha256sum -c -
+          echo "d12b0e00134e279b4d959bfb18a7644c3dc3e5f9037c32ff913d6fa25b74fdf9  panda/board/obj/panda.bin.signed" | sha256sum -c -
+
+          for file in selfdrive/ui/_ui selfdrive/ui/_ui_nonav; do
+            strings -a "$file" | grep -F "Enable Subaru Steering Stages"
+            strings -a "$file" | grep -F "Steering Authority Stage"
+            strings -a "$file" | grep -F "dp_toyota_cruise_override_speed"
+            strings -a "$file" | grep -F "dp_toyota_cruise_override"
+            ! strings -a "$file" | grep -F "dp_subaru_steer_stage"
+            ! strings -a "$file" | grep -F "dp_subaru_steer_enable"
+          done
+
+      - name: Verify host configuration
+        run: |
+          python3 -m py_compile \
+            common/dp_conf.py \
+            selfdrive/car/subaru/interface.py \
+            selfdrive/car/subaru/values.py \
+            panda/python/__init__.py \
+            tools/subaru_steering_stage.py \
+            tools/subaru_steering_diag.py
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          conf = Path("common/dp_conf.py").read_text()
+          interface = Path("selfdrive/car/subaru/interface.py").read_text()
+          values = Path("selfdrive/car/subaru/values.py").read_text()
+          panda = Path("panda/python/__init__.py").read_text()
+
+          assert "dp_subaru_steer_stage" not in conf
+          assert "dp_subaru_steer_enable" not in conf
+          assert "'dp_toyota_cruise_override_speed', 'default': 0" in conf
+          assert "'min': 0, 'max': 6" in conf
+          assert 'Params().get("dp_toyota_cruise_override_speed", encoding="utf8")' in interface
+          assert 'Params().get_bool("dp_toyota_cruise_override")' in interface
+          assert "steer_research_enabled and steer_stage > 0 and research_eps" in interface
+          assert "b'z\\xc0\\n\\x00'" in interface
+          assert "SUBARU_STEER_MAX_STAGES = (2047, 2150, 2300, 2450, 2600, 2800, 3071)" in values
+          assert "FLAG_SUBARU_MAX_STEER_IMPREZA_2018 = 2" in panda
+
+          print("Final C2 Subaru pull-ready branch contents verified")
+          PY

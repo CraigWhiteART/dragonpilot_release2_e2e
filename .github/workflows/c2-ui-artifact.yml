@@ -1,0 +1,27 @@
+name: C2 UI Binary Artifact
+
+on:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - ".github/workflows/c2-ui-artifact.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package exact shipped UI binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-original-ui-binaries
+          path: |
+            selfdrive/ui/_ui
+            selfdrive/ui/_ui_nonav
+          if-no-files-found: error
+          retention-days: 3

@@ -1,0 +1,262 @@
+name: C2 Subaru Panda Research
+
+on:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - "tools/research/patch_c2_legacy_panda.py"
+      - "tools/research/test_c2_subaru_panda_safety.py"
+      - "tools/research/c2_subaru_panda_native_test.c"
+      - "tools/research/patch_c2_settings_ui.py"
+      - "tools/research/patch_c2_exact_ui.py"
+      - "panda/python/__init__.py"
+      - "common/dp_conf.py"
+      - "selfdrive/car/subaru/interface.py"
+      - "selfdrive/car/subaru/values.py"
+      - "tools/subaru_steering_diag.py"
+      - "tools/subaru_steering_stage.py"
+      - ".github/workflows/c2-subaru-panda-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-safety:
+    name: Direct reconstructed Panda steering safety
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+
+      - name: Clone and patch pinned legacy Panda
+        run: |
+          git clone --quiet https://github.com/dragonpilot/panda.git /tmp/panda-native
+          git -C /tmp/panda-native checkout --quiet 1d732d4747ea81c199906e9f1fc620911fb8add0
+          python3 tools/research/patch_c2_legacy_panda.py /tmp/panda-native
+
+      - name: Compile and run native safety assertions
+        run: |
+          gcc -std=gnu11 -O0 -Wfatal-errors \
+            -I/tmp/panda-native/tests/libpanda \
+            -I/tmp/panda-native/board \
+            -I/tmp/panda-native \
+            tools/research/c2_subaru_panda_native_test.c \
+            -o /tmp/c2_subaru_panda_native_test
+          /tmp/c2_subaru_panda_native_test
+
+  build-and-test:
+    name: Reconstruct, build, and safety-test legacy C2 Panda
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout DragonPilot host research branch
+        uses: actions/checkout@v4
+
+      - name: Validate gated host-side research profile
+        run: |
+          python3 -m py_compile \
+            selfdrive/car/subaru/interface.py \
+            selfdrive/car/subaru/values.py \
+            common/dp_conf.py \
+            panda/python/__init__.py \
+            tools/subaru_steering_diag.py \
+            tools/subaru_steering_stage.py
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          interface = Path("selfdrive/car/subaru/interface.py").read_text()
+          values = Path("selfdrive/car/subaru/values.py").read_text()
+          panda_py = Path("panda/python/__init__.py").read_text()
+          conf = Path("common/dp_conf.py").read_text()
+
+          assert "FLAG_SUBARU_MAX_STEER_IMPREZA_2018 = 2" in panda_py
+          assert "'dp_toyota_cruise_override'" in conf
+          assert "'dp_toyota_cruise_override_speed'" in conf
+          assert "'default': 0" in conf
+          assert "'default': 0" in conf
+          assert "'max': 6" in conf
+
+          # Experimental EPS must remain separate from the community-tested set.
+          assert "IMPREZA_HIGH_TORQUE_RESEARCH_EPS_FW" in interface
+          assert "b'z\\xc0\\n\\x00'" in interface
+          tested_block = interface.split("IMPREZA_2018_EPS_FW = {", 1)[1].split("}", 1)[0]
+          assert "b'z\\xc0\\n\\x00'" not in tested_block
+
+          # SafetyParam 2 can only turn on for a non-stock stage + exact EPS match.
+          assert 'Params().get("dp_toyota_cruise_override_speed", encoding="utf8")' in interface
+          assert "steer_research_enabled and steer_stage > 0 and research_eps" in interface
+          assert "Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018" in interface
+
+          # Host choices are a fixed progressive set; stage 0 remains stock.
+          expected = "(2047, 2150, 2300, 2450, 2600, 2800, 3071)"
+          assert f"SUBARU_STEER_MAX_STAGES = {expected}" in values
+          assert 'Params().get("dp_toyota_cruise_override_speed", encoding="utf8")' in values
+          assert "self.STEER_MAX = SUBARU_STEER_MAX_STAGES[stage]" in values
+          assert "self.STEER_MAX = 2047" in values
+
+          print("Host research profile is exact-EPS gated with stages:", expected)
+          PY
+
+      - name: Validate exact 2023 C2 settings binary patch
+        run: |
+          cp selfdrive/ui/_ui /tmp/c2-ui
+          cp selfdrive/ui/_ui_nonav /tmp/c2-ui-nonav
+          python3 tools/research/patch_c2_exact_ui.py /tmp/c2-ui /tmp/c2-ui-nonav
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          expected = {
+            "/tmp/c2-ui": "df17a7d160ae3d2df527892345d43475f5846d4f532ffc79874059035cf15a2c",
+            "/tmp/c2-ui-nonav": "5eb06f3e6d45c8743332e7dadd0cf7abacbe5397184c363db3b7d4e8626c7ad2",
+          }
+          for path, digest in expected.items():
+            data = Path(path).read_bytes()
+            assert hashlib.sha256(data).hexdigest() == digest
+            assert b"dp_toyota_cruise_override" in data
+            assert b"dp_toyota_cruise_override_speed" in data
+            assert b"Steering Authority Stage" in data
+            assert b"Enable Subaru Steering Stages" in data
+          print("Exact C2 UI binary patch validated")
+          PY
+
+      - name: Clone pinned legacy Panda source
+        run: |
+          git clone https://github.com/dragonpilot/panda.git /tmp/panda-c2
+          git -C /tmp/panda-c2 checkout 1d732d4747ea81c199906e9f1fc620911fb8add0
+          test "$(git -C /tmp/panda-c2 rev-parse HEAD)" = "1d732d4747ea81c199906e9f1fc620911fb8add0"
+
+      - name: Apply C2 compatibility and Subaru research patch
+        run: |
+          python3 tools/research/patch_c2_legacy_panda.py /tmp/panda-c2
+          cp tools/research/test_c2_subaru_panda_safety.py /tmp/panda-c2/tests/test_c2_subaru_panda_safety.py
+
+      - name: Validate safety invariants and C2 ABI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import struct
+
+          root = Path("/tmp/panda-c2")
+          subaru = (root / "board/safety/safety_subaru.h").read_text()
+          py = (root / "python/__init__.py").read_text()
+          health = (root / "board/health.h").read_text()
+
+          assert subaru.count(".max_steer = 2047") == 1
+          assert subaru.count(".max_steer = 3071") == 1
+          assert subaru.count(".max_steer = 1000") == 1
+
+          alt = subaru.split("SUBARU_STEERING_LIMITS_IMPREZA_2018", 1)[1].split("};", 1)[0]
+          required = {
+              ".max_rt_delta = 940",
+              ".max_rt_interval = 250000",
+              ".max_rate_up = 50",
+              ".max_rate_down = 70",
+              ".driver_torque_factor = 50",
+              ".driver_torque_allowance = 60",
+              ".type = TorqueDriverLimited",
+          }
+          missing = sorted(x for x in required if x not in alt)
+          assert not missing, missing
+
+          assert "SUBARU_PARAM_MAX_STEER_IMPREZA_2018 = 2" in subaru
+          assert "FLAG_SUBARU_MAX_STEER_IMPREZA_2018 = 2" in py
+          assert "#define ALT_EXP_ALKA 16" in (root / "board/safety_declarations.h").read_text()
+
+          m = re.search(r'HEALTH_STRUCT = struct\.Struct\("([^"]+)"\)', py)
+          assert m
+          fmt = m.group(1)
+          assert fmt == "<IIIIIIIIIBBBBBBHBBBHfBBB", fmt
+          assert struct.calcsize(fmt) == 56, struct.calcsize(fmt)
+          assert "uint8_t usb_power_mode;" in health
+
+          print("Stock Subaru max: 2047")
+          print("Experimental safetyParam=2 max: 3071")
+          print("Gen2 Subaru max: 1000")
+          print("Dynamic torque limits unchanged")
+          print("C2 health v11 Python struct size:", struct.calcsize(fmt))
+          PY
+
+      - name: Build historical Panda toolchain image
+        run: |
+          export DOCKER_BUILDKIT=1
+          docker build -t c2-panda-research -f /tmp/panda-c2/Dockerfile /tmp/panda-c2
+
+      - name: Build F4 Panda firmware
+        run: |
+          docker run --rm             -v /tmp/panda-c2:/tmp/openpilot/panda             -w /tmp/openpilot/panda             c2-panda-research             /bin/bash -lc 'scons -j$(nproc)'
+
+      - name: Run dependency-free Subaru steering safety checks
+        run: |
+          docker run --rm \
+            -v /tmp/panda-c2:/tmp/openpilot/panda \
+            -w /tmp/openpilot/panda \
+            c2-panda-research \
+            /bin/bash -lc 'python tests/test_c2_subaru_panda_safety.py'
+
+      - name: Run historical full Subaru Panda safety suite (informational)
+        continue-on-error: true
+        run: |
+          docker run --rm             -v /tmp/panda-c2:/tmp/openpilot/panda             -w /tmp/openpilot/panda             c2-panda-research             /bin/bash -lc '
+              cd /tmp/openpilot &&
+              rm -rf opendbc &&
+              git clone https://github.com/commaai/opendbc.git opendbc &&
+              git -C opendbc checkout 296f190000a2e71408e207ba21a2257cc853ec15 &&
+              cp opendbc/SConstruct SConstruct.opendbc &&
+              scons -f SConstruct.opendbc -j$(nproc) &&
+              cd panda &&
+              scons -j$(nproc) &&
+              python -m unittest tests.safety.test_subaru
+            '
+
+      - name: Show firmware metadata
+        run: |
+          ls -lh /tmp/panda-c2/board/obj/panda.bin.signed
+          sha256sum /tmp/panda-c2/board/obj/panda.bin.signed
+          cat /tmp/panda-c2/board/obj/version
+
+      - name: Package research metadata
+        run: |
+          mkdir -p /tmp/c2-panda-artifact
+          cp /tmp/panda-c2/board/obj/panda.bin.signed /tmp/c2-panda-artifact/
+          cp /tmp/panda-c2/board/obj/version /tmp/c2-panda-artifact/
+          cp /tmp/panda-c2/board/safety/safety_subaru.h /tmp/c2-panda-artifact/safety_subaru.h
+          cat > /tmp/c2-panda-artifact/README.txt <<'EOF'
+          RESEARCH ARTIFACT ONLY - DO NOT FLASH WITHOUT MATCHED HOST CONFIGURATION
+
+          Base Panda source:
+            dragonpilot/panda
+            1d732d4747ea81c199906e9f1fc620911fb8add0
+
+          Profiles:
+            Subaru stock safetyParam 0: max_steer 2047
+            Subaru Gen2 safetyParam 1: max_steer 1000
+            Subaru research safetyParam 2: max_steer 3071
+
+          safetyParam 2 preserves the stock early-Subaru:
+            max_rt_delta 940
+            max_rt_interval 250000 us
+            max_rate_up 50
+            max_rate_down 70
+            driver_torque_factor 50
+            driver_torque_allowance 60
+
+          This build includes reconstructed DragonPilot ALKA behavior and the
+          C2 release's v11 health-packet byte layout. The usb_power_mode byte
+          is an ABI placeholder pending exact private-source reconstruction.
+          EOF
+
+      - name: Upload research firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-subaru-panda-research
+          path: /tmp/c2-panda-artifact/
+          if-no-files-found: error
+          retention-days: 14

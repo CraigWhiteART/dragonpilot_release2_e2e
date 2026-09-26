@@ -1,0 +1,34 @@
+name: C2 UI Inspect
+
+on:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - ".github/workflows/c2-ui-inspect.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect exact 2023 DragonPilot settings symbols
+        run: |
+          set -u
+          file selfdrive/ui/_ui
+          echo "=== DPCarPanel symbols ==="
+          nm -C selfdrive/ui/_ui 2>/dev/null | grep 'DPCarPanel::' || true
+          echo "=== other DP panel symbols ==="
+          nm -C selfdrive/ui/_ui 2>/dev/null | grep -E 'DP[A-Za-z]+Panel::' || true
+          echo "=== exact DP params ==="
+          strings -a -n 4 selfdrive/ui/_ui | grep -E '^dp_[a-z0-9_]+$' | sort -u || true
+          echo "=== settings_dp compile unit ==="
+          readelf --debug-dump=info selfdrive/ui/_ui 2>/dev/null | grep -B12 -A80 'settings_dp.cc' | head -400 || true
+          echo "=== settings_dp line table first/last ==="
+          readelf --debug-dump=decodedline selfdrive/ui/_ui 2>/dev/null | grep 'settings_dp.cc' | head -120 || true
+          readelf --debug-dump=decodedline selfdrive/ui/_ui 2>/dev/null | grep 'settings_dp.cc' | tail -120 || true

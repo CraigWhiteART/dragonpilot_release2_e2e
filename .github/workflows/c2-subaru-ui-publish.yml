@@ -1,0 +1,64 @@
+name: C2 Subaru UI Publish
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - "tools/research/patch_c2_exact_ui.py"
+      - ".github/workflows/c2-subaru-ui-publish.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: c2-subaru-ui-publish
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch exact C2 UI binaries
+        run: |
+          python3 tools/research/patch_c2_exact_ui.py             selfdrive/ui/_ui             selfdrive/ui/_ui_nonav
+
+      - name: Validate patched UI artifacts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          expected = {
+            "selfdrive/ui/_ui": "df17a7d160ae3d2df527892345d43475f5846d4f532ffc79874059035cf15a2c",
+            "selfdrive/ui/_ui_nonav": "5eb06f3e6d45c8743332e7dadd0cf7abacbe5397184c363db3b7d4e8626c7ad2",
+          }
+          for path, digest in expected.items():
+            data = Path(path).read_bytes()
+            assert hashlib.sha256(data).hexdigest() == digest
+            assert b"dp_toyota_cruise_override" in data
+            assert b"dp_toyota_cruise_override_speed" in data
+            assert b"Enable Subaru Steering Stages" in data
+            assert b"Steering Authority Stage" in data
+          print("UI artifacts validated")
+          PY
+
+      - name: Publish UI binaries
+        run: |
+          if git diff --quiet -- selfdrive/ui/_ui selfdrive/ui/_ui_nonav; then
+            echo "UI binaries already published"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add selfdrive/ui/_ui selfdrive/ui/_ui_nonav
+          git commit -m "Publish exact C2 Subaru steering-stage UI"
+          git pull --rebase origin c2-subaru-panda-research
+          git push origin HEAD:c2-subaru-panda-research

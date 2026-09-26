@@ -1,0 +1,140 @@
+name: C2 Subaru Pull Ready
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - "tools/research/patch_c2_exact_ui.py"
+      - "tools/research/patch_c2_legacy_panda.py"
+      - "tools/research/test_c2_subaru_panda_safety.py"
+      - "tools/research/c2_subaru_panda_native_test.c"
+      - "common/dp_conf.py"
+      - "selfdrive/car/subaru/interface.py"
+      - "selfdrive/car/subaru/values.py"
+      - "panda/python/__init__.py"
+      - ".github/workflows/c2-subaru-pull-ready.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: c2-subaru-pull-ready
+  cancel-in-progress: true
+
+jobs:
+  package:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout research branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch exact 2023 C2 UI binaries
+        run: |
+          python3 tools/research/patch_c2_exact_ui.py             selfdrive/ui/_ui             selfdrive/ui/_ui_nonav
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          expected = {
+            "selfdrive/ui/_ui": "df17a7d160ae3d2df527892345d43475f5846d4f532ffc79874059035cf15a2c",
+            "selfdrive/ui/_ui_nonav": "5eb06f3e6d45c8743332e7dadd0cf7abacbe5397184c363db3b7d4e8626c7ad2",
+          }
+          for name, want in expected.items():
+            data = Path(name).read_bytes()
+            got = hashlib.sha256(data).hexdigest()
+            assert got == want, (name, got)
+            for marker in (
+              b"dp_toyota_cruise_override_speed",
+              b"dp_toyota_cruise_override",
+              b"Steering Authority Stage",
+              b"Enable Subaru Steering Stages",
+            ):
+              assert marker in data, (name, marker)
+                      print("Exact C2 UI binaries contain the Subaru 0..6 stage selector")
+          PY
+
+      - name: Clone pinned legacy Panda
+        run: |
+          git clone --quiet https://github.com/dragonpilot/panda.git /tmp/panda-c2
+          git -C /tmp/panda-c2 checkout --quiet 1d732d4747ea81c199906e9f1fc620911fb8add0
+          test "$(git -C /tmp/panda-c2 rev-parse HEAD)" = "1d732d4747ea81c199906e9f1fc620911fb8add0"
+
+      - name: Apply reconstructed C2 Panda patch
+        run: |
+          python3 tools/research/patch_c2_legacy_panda.py /tmp/panda-c2
+          cp tools/research/test_c2_subaru_panda_safety.py /tmp/panda-c2/tests/test_c2_subaru_panda_safety.py
+
+      - name: Fast native Panda safety assertions
+        run: |
+          gcc -std=gnu11 -O0 -Wfatal-errors             -I/tmp/panda-c2/tests/libpanda             -I/tmp/panda-c2/board             -I/tmp/panda-c2             tools/research/c2_subaru_panda_native_test.c             -o /tmp/c2_subaru_panda_native_test
+          /tmp/c2_subaru_panda_native_test
+
+      - name: Build historical Panda toolchain image
+        run: |
+          export DOCKER_BUILDKIT=1
+          docker build -t c2-panda-research -f /tmp/panda-c2/Dockerfile /tmp/panda-c2
+
+      - name: Build C2 F4 Panda firmware
+        run: |
+          docker run --rm             -v /tmp/panda-c2:/tmp/openpilot/panda             -w /tmp/openpilot/panda             c2-panda-research             /bin/bash -lc 'scons -j$(nproc)'
+
+      - name: Run compiled Panda steering assertions
+        run: |
+          docker run --rm             -v /tmp/panda-c2:/tmp/openpilot/panda             -w /tmp/openpilot/panda             c2-panda-research             /bin/bash -lc 'python tests/test_c2_subaru_panda_safety.py'
+
+      - name: Install matched firmware into DragonPilot tree
+        run: |
+          test -s /tmp/panda-c2/board/obj/panda.bin.signed
+          cp /tmp/panda-c2/board/obj/panda.bin.signed panda/board/obj/panda.bin.signed
+
+          echo "Packaged Panda:"
+          sha256sum panda/board/obj/panda.bin.signed
+          ls -lh panda/board/obj/panda.bin.signed
+
+      - name: Validate host/Panda gating
+        run: |
+          python3 -m py_compile             common/dp_conf.py             selfdrive/car/subaru/interface.py             selfdrive/car/subaru/values.py             panda/python/__init__.py             tools/subaru_steering_stage.py
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          interface = Path("selfdrive/car/subaru/interface.py").read_text()
+          conf = Path("common/dp_conf.py").read_text()
+          values = Path("selfdrive/car/subaru/values.py").read_text()
+          panda_py = Path("panda/python/__init__.py").read_text()
+
+          assert "'dp_toyota_cruise_override'" in conf
+          assert "'dp_toyota_cruise_override_speed'" in conf
+          assert "'default': 0" in conf
+          assert "steer_research_enabled and steer_stage > 0 and research_eps" in interface
+          assert "b'z\\xc0\\n\\x00'" in interface
+          assert "SUBARU_STEER_MAX_STAGES = (2047, 2150, 2300, 2450, 2600, 2800, 3071)" in values
+          assert "FLAG_SUBARU_MAX_STEER_IMPREZA_2018 = 2" in panda_py
+          print("Host and Panda research gates match")
+          PY
+
+      - name: Commit pull-ready artifacts
+        run: |
+          # Source-only commits may have landed while the historical Panda image
+          # was building. Rebase first; our generated binary changes remain in
+          # the working tree and are replayed onto the newest branch head.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git stash push -m pull-ready-artifacts -- selfdrive/ui/_ui selfdrive/ui/_ui_nonav panda/board/obj/panda.bin.signed
+          git pull --rebase origin c2-subaru-panda-research
+          git stash pop
+
+          if git diff --quiet -- selfdrive/ui/_ui selfdrive/ui/_ui_nonav panda/board/obj/panda.bin.signed; then
+            echo "Pull-ready artifacts already committed"
+            exit 0
+          fi
+
+          git add selfdrive/ui/_ui selfdrive/ui/_ui_nonav\n          git add -f panda/board/obj/panda.bin.signed
+          git commit -m "Package pull-ready C2 Subaru steering research build"
+          git push origin HEAD:c2-subaru-panda-research

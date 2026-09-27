@@ -1,0 +1,61 @@
+name: C2 Publish Tested Panda
+
+on:
+  push:
+    branches:
+      - c2-subaru-panda-research
+    paths:
+      - ".github/workflows/c2-panda-publish-tested.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download exact tested Panda artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          gh api             -H "Accept: application/vnd.github+json"             /repos/CraigWhiteART/dragonpilot_release2_e2e/actions/artifacts/10908264349/zip             > /tmp/c2-panda-tested.zip
+          rm -rf /tmp/c2-panda-tested
+          mkdir -p /tmp/c2-panda-tested
+          unzip -q /tmp/c2-panda-tested.zip -d /tmp/c2-panda-tested
+          test -s /tmp/c2-panda-tested/panda.bin.signed
+
+      - name: Verify tested firmware identity
+        run: |
+          set -euxo pipefail
+          echo "d12b0e00134e279b4d959bfb18a7644c3dc3e5f9037c32ff913d6fa25b74fdf9  /tmp/c2-panda-tested/panda.bin.signed" | sha256sum -c -
+          test "$(cat /tmp/c2-panda-tested/version)" = "DEV-1d732d47-DEBUG"
+          grep -F "Subaru stock safetyParam 0: max_steer 2047" /tmp/c2-panda-tested/README.txt
+          grep -F "Subaru research safetyParam 2: max_steer 3071" /tmp/c2-panda-tested/README.txt
+          grep -F "max_rate_up 50" /tmp/c2-panda-tested/README.txt
+          grep -F "driver_torque_allowance 60" /tmp/c2-panda-tested/README.txt
+
+      - name: Publish tested firmware
+        run: |
+          set -euxo pipefail
+          cp /tmp/c2-panda-tested/panda.bin.signed panda/board/obj/panda.bin.signed
+          echo "d12b0e00134e279b4d959bfb18a7644c3dc3e5f9037c32ff913d6fa25b74fdf9  panda/board/obj/panda.bin.signed" | sha256sum -c -
+
+          if git diff --quiet -- panda/board/obj/panda.bin.signed; then
+            echo "Exact tested Panda firmware is already published"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f panda/board/obj/panda.bin.signed
+          git commit -m "Publish tested C2 Subaru research Panda firmware"
+          git pull --rebase origin c2-subaru-panda-research
+          git push origin HEAD:c2-subaru-panda-research

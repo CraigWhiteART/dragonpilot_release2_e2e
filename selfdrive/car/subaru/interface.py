@@ -17,6 +17,13 @@ IMPREZA_2018_EPS_FW = {
   b'\x8a\xc0\x00\x00',
 }
 
+# Craig's detected EPS revision. Keep this separate from the community-tested
+# 3071 allowlist above: no public evidence was found proving 7ac00a00 at 3071.
+# It can only select the research Panda profile when the explicit param is set.
+IMPREZA_HIGH_TORQUE_RESEARCH_EPS_FW = {
+  b'z\xc0\n\x00',
+}
+
 
 class CarInterface(CarInterfaceBase):
 
@@ -38,6 +45,7 @@ class CarInterface(CarInterfaceBase):
 
     ret.steerLimitTimer = 0.4
     ret.steerActuatorDelay = 0.1
+    research_3071_defaults = False
     CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     if candidate == CAR.ASCENT:
@@ -64,6 +72,31 @@ class CarInterface(CarInterfaceBase):
       # without increasing the Panda-enforced steering torque limit.
       if any((fw.ecu == "eps" or fw.ecu == car.CarParams.Ecu.eps) and fw.fwVersion in IMPREZA_2018_EPS_FW for fw in car_fw):
         ret.steerActuatorDelay = 0.18
+
+      research_eps = any(
+        (fw.ecu == "eps" or fw.ecu == car.CarParams.Ecu.eps) and fw.fwVersion in IMPREZA_HIGH_TORQUE_RESEARCH_EPS_FW
+        for fw in car_fw
+      )
+      steer_stage_raw = Params().get("dp_toyota_cruise_override_speed", encoding="utf8")
+      try:
+        steer_stage = int(steer_stage_raw) if steer_stage_raw else 0
+      except ValueError:
+        steer_stage = 0
+      steer_stage = max(0, min(steer_stage, 6))
+      steer_research_enabled = Params().get_bool("dp_toyota_cruise_override")
+      if steer_research_enabled and steer_stage > 0 and research_eps:
+        # The matched research Panda safety profile is required for >2047.
+        ret.safetyConfigs[0].safetyParam |= Panda.FLAG_SUBARU_MAX_STEER_IMPREZA_2018
+
+        # The merged sunnypilot 3071 profile used the measured ~0.18 s delay
+        # for this early Impreza/Crosstrek steering rack. Treat delay as a rack
+        # characteristic, so use it for all explicitly-enabled research stages.
+        ret.steerActuatorDelay = 0.18
+
+        # The historical PID gains below were scaled for the full 3071 range.
+        # Only apply them at stage 6; intermediate stages retain their existing
+        # controller tune so staged authority comparisons remain interpretable.
+        research_3071_defaults = steer_stage == 6
 
       ret.lateralTuning.init('pid')
       ret.lateralTuning.pid.kf = 0.00005
@@ -122,6 +155,16 @@ class CarInterface(CarInterfaceBase):
       raise ValueError(f"unknown car: {candidate}")
 
     CarInterfaceBase.configure_dp_tune(candidate, ret.lateralTuning)
+
+    # DragonPilot's controller selector runs after the car-specific block and
+    # normally restores the legacy Impreza PID tune. Re-apply the documented
+    # 3071-era PID scaling only when PID (Controller Type 1) is explicitly
+    # selected. Torque (Type 3) remains untouched.
+    if candidate == CAR.IMPREZA and research_3071_defaults and ret.lateralTuning.which() == 'pid':
+      ret.lateralTuning.pid.kf = 0.00003333
+      ret.lateralTuning.pid.kiBP, ret.lateralTuning.pid.kpBP = [[0., 20.], [0., 20.]]
+      ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.133, 0.2], [0.0133, 0.02]]
+
     Params().put("dp_lateral_steer_rate_cost", "0.7")
     return ret
 

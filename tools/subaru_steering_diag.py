@@ -7,6 +7,7 @@ Run from the openpilot/dragonpilot checkout:
 
 from cereal import car
 from common.params import Params
+from panda import DEFAULT_FW_FN, Panda
 from selfdrive.car.subaru.values import CAR, CarControllerParams
 
 
@@ -15,6 +16,10 @@ KNOWN_3071_EPS_FW = {
   b'z\xc0\x04\x00',
   b'z\xc0\x08\x00',
   b'\x8a\xc0\x00\x00',
+}
+
+RESEARCH_EPS_FW = {
+  b'z\xc0\n\x00',
 }
 
 
@@ -58,12 +63,31 @@ def main():
   print(f"steerLimitTimer:      {CP.steerLimitTimer}")
 
   try:
-    print(f"lateralTuning:        {CP.lateralTuning.which()}")
+    lateral_tune = CP.lateralTuning.which()
+    print(f"lateralTuning:        {lateral_tune}")
+    if lateral_tune == "pid":
+      print(f"PID kf:               {CP.lateralTuning.pid.kf}")
+      print(f"PID kpV:              {list(CP.lateralTuning.pid.kpV)}")
+      print(f"PID kiV:              {list(CP.lateralTuning.pid.kiV)}")
+    elif lateral_tune == "torque":
+      print(f"torque kp/ki/kf:      {CP.lateralTuning.torque.kp} / {CP.lateralTuning.torque.ki} / {CP.lateralTuning.torque.kf}")
+      print(f"torque latAccelFactor:{CP.lateralTuning.torque.latAccelFactor:>8}")
+      print(f"torque friction:      {CP.lateralTuning.torque.friction}")
   except Exception:
+    lateral_tune = "<unknown>"
     print("lateralTuning:        <unknown>")
 
   print(f"dp_lateral_tune:      {get_param_text(params, 'dp_lateral_tune')}")
   print(f"dp_steer_rate_cost:   {get_param_text(params, 'dp_lateral_steer_rate_cost')}")
+  print(f"research enabled:    {'YES' if params.get_bool('dp_toyota_cruise_override') else 'no'}")
+  print(f"research steer stage:{get_param_text(params, 'dp_toyota_cruise_override_speed'):>8}")
+
+  try:
+    expected_sig = Panda.get_signature_from_firmware(DEFAULT_FW_FN)
+    active_sigs = params.get("PandaSignatures") or b""
+    print(f"panda firmware match: {'YES' if expected_sig and expected_sig in active_sigs else 'no/unknown'}")
+  except Exception as exc:
+    print(f"panda firmware match: <unable to verify: {exc}>")
 
   if len(CP.safetyConfigs):
     for i, cfg in enumerate(CP.safetyConfigs):
@@ -81,7 +105,19 @@ def main():
     print("EPS firmware:         <not present in cached CarParams>")
 
   known_high_torque_eps = any(version in KNOWN_3071_EPS_FW for version in eps_fw)
+  research_eps = any(version in RESEARCH_EPS_FW for version in eps_fw)
   print(f"known 3071-era EPS:   {'YES' if known_high_torque_eps else 'no/unknown'}")
+  print(f"research EPS match:   {'YES (7ac00a00)' if research_eps else 'no'}")
+  research_profile_on = controller.STEER_MAX > 2047
+  stage_text = get_param_text(params, 'dp_toyota_cruise_override_speed')
+  try:
+    stage_num = int(stage_text)
+  except (TypeError, ValueError):
+    stage_num = 0
+  historical_3071_defaults = research_eps and research_profile_on and stage_num == 6
+  print(f"research profile on:  {'YES' if research_profile_on else 'no'}")
+  print(f"3071-era delay active:{' YES' if research_eps and research_profile_on and abs(CP.steerActuatorDelay - 0.18) < 0.001 else ' no'}")
+  print(f"3071-era PID active:  {'YES' if historical_3071_defaults and lateral_tune == 'pid' else 'no'}")
 
   if CP.carFingerprint == CAR.IMPREZA:
     if known_high_torque_eps:
@@ -93,6 +129,11 @@ def main():
       print("")
       print("This is the 2017-19 Impreza/Crosstrek platform, but the cached EPS firmware")
       print("did not match the known community-tested 3071 firmware list.")
+      if research_eps:
+        print("7ac00a00 is the separately gated research EPS revision; it is not being")
+        print("represented as community-proven at 3071.")
+        if controller.STEER_MAX > 2047:
+          print(f"Current staged host ceiling: {controller.STEER_MAX} (Panda research absolute max 3071).")
 
 
 if __name__ == "__main__":

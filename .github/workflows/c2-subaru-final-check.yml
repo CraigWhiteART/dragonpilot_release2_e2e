@@ -68,6 +68,11 @@ jobs:
           assert 'Params().get("dp_toyota_cruise_override_speed", encoding="utf8")' in interface
           assert 'Params().get_bool("dp_toyota_cruise_override")' in interface
           assert "steer_research_enabled and steer_stage > 0 and research_eps" in interface
+          assert "research_3071_defaults = steer_stage == 6" in interface
+          assert "ret.steerActuatorDelay = 0.18" in interface
+          assert "ret.lateralTuning.pid.kf = 0.00003333" in interface
+          assert "ret.lateralTuning.pid.kpV, ret.lateralTuning.pid.kiV = [[0.133, 0.2], [0.0133, 0.02]]" in interface
+          assert "ret.lateralTuning.which() == 'pid'" in interface
           assert "b'z\\xc0\\n\\x00'" in interface
           assert "SUBARU_STEER_MAX_STAGES = (2047, 2150, 2300, 2450, 2600, 2800, 3071)" in values
           assert "FLAG_SUBARU_MAX_STEER_IMPREZA_2018 = 2" in panda
